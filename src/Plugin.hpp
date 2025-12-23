@@ -36,11 +36,16 @@ public:
 	virtual void 			FireGameEvent(IGameEvent* event);
 	virtual int	 			GetEventDebugID();
 
+	bool					IsGamePortal2();
+
 private:
     // IGameEventListener2
     int 					m_nDebugID;
+
+	bool					m_bNoUnload;
+	bool 					m_bIsGamePortal2;
 };
 
-extern CPlugin plugin;
+extern CPlugin g_Plugin;
 
 #endif // PLUGIN_HPP

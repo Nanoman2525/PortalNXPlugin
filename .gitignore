@@ -1,0 +1,5 @@
+*.nrr
+*.nro
+build/
+.vscode/
+.DS_Store

@@ -5,9 +5,7 @@ This is a base repository to build server plugins on the Nintendo Switch version
 # Compiling
 
 1. Have [devkitPro](https://devkitpro.org/wiki/Getting_Started) installed for the current platform.
-2. Depending on the target game, run the `MakeFile` by doing...
-   - ```make GAME_TYPE="-DPORTAL"``` (for Portal)
-   - ```make GAME_TYPE="-DPORTAL2"``` (for Portal 2)
+2. Run the `MakeFile` by doing ```make```.
 3. The plugin `.nro` will appear at the root.
 
 # How loading it works
