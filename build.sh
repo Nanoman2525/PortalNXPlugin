@@ -73,7 +73,7 @@ patch_and_copy()
 
     # Copy it to a destination
     echo "Copying to $GAME_NAME destination..."
-    DEST_PATH="${RYUJINX_PATH}/mods/contents/${GAME_ID}/romfs"
+    DEST_PATH="${RYUJINX_PATH}/sdcard/atmosphere/contents/${GAME_ID}/romfs"
     mv -v launcher_main.nrr "${DEST_PATH}/.nrr"
     cp -v "${PLUGIN_NAME}.nro" "${DEST_PATH}/nro"
 }

@@ -71,9 +71,6 @@ bool CPlugin::Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn gameSer
 
 		extern Variable nx_max_players_override;
 		nx_max_players_override.Unregister();
-
-		extern Command nx_toggle_reportals;
-		nx_toggle_reportals.Unregister();
 	}
 
 	void ToggleVTableDetours(bool bPatching);

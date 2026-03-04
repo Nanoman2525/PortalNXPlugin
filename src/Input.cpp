@@ -872,7 +872,7 @@ extern "C" void Msg( const char* pMsg, ... );
 // Add a copy of Saul's cvar unhiding functionality
 #include "Command.hpp"
 extern void *g_pCVar;
-CON_COMMAND(cvar_unhide_all, "Unhide all FCVAR_HIDDEN and FCVAR_DEVELOPMENTONLY convars")
+CON_COMMAND(nx_cvar_unhide_all, "Unhide all FCVAR_HIDDEN and FCVAR_DEVELOPMENTONLY convars")
 {
 	// Unhide dev cvars
     FOR_ALL_CONSOLE_COMMANDS( pCommand )
@@ -884,7 +884,8 @@ CON_COMMAND(cvar_unhide_all, "Unhide all FCVAR_HIDDEN and FCVAR_DEVELOPMENTONLY 
     }
 }
 
-DECL_DECLARE_AUTOCOMPLETION_FUNCTION(nx_gamecube_input_support)
+// TODO: Come back to GameCube support later
+/*DECL_DECLARE_AUTOCOMPLETION_FUNCTION(nx_gamecube_input_support)
 {
 	const char *pszCMD = "nx_gamecube_input_support ";
 	const char *pszPresets[] = { "add", "remove" };
@@ -952,4 +953,4 @@ CON_COMMAND(nx_get_gamecube_controller_state, "Test command for GameCube control
     Msg("GcState.analog_stick_r: x: %d, y: %d\n", GcState.analog_stick_r.x, GcState.analog_stick_r.y);
     Msg("GcState.trigger_l: %d\n", GcState.trigger_l);
     Msg("GcState.trigger_r: %d\n", GcState.trigger_r);
-}
+}*/

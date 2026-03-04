@@ -34,11 +34,11 @@ CON_COMMAND(nx_toggle_autojump, "Toggles the autojump ability for all players.")
     }
 }
 
-CON_COMMAND(nx_toggle_reportals, "Toggles the reportal ability for all players.")
+CON_COMMAND(nx_toggle_floor_reportals, "Toggles the floor reportal ability for all players.")
 {
     if (!g_Plugin.IsGamePortal2())
     {
-        Msg("nx_toggle_reportals - Works only on Portal 2 game binaries.\n");
+        Msg("nx_toggle_floor_reportals - Works only on Portal 2 game binaries.\n");
         return;
     }
 
@@ -57,7 +57,7 @@ CON_COMMAND(nx_toggle_reportals, "Toggles the reportal ability for all players."
         uint8_t patch[4] = { 0x1F, 0x20, 0x03, 0xD5 }; // Nop
         memcpy((void *)(servernrobase + Offsets::CPortal_Base2D__NewLocation_reportal), patch, sizeof(patch));
 
-        Msg("nx_toggle_reportals - Patched.\n");
+        Msg("nx_toggle_floor_reportals - Patched.\n");
     }
     else
     {
@@ -65,7 +65,7 @@ CON_COMMAND(nx_toggle_reportals, "Toggles the reportal ability for all players."
 
         memcpy((void *)(servernrobase + Offsets::CPortal_Base2D__NewLocation_reportal), orig_bytes, sizeof(orig_bytes));
 
-        Msg("nx_toggle_reportals - Unpatched.\n");
+        Msg("nx_toggle_floor_reportals - Unpatched.\n");
     }
 }
 

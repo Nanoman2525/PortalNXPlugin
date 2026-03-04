@@ -83,7 +83,8 @@ namespace nn
             int32_t y;
         };
 
-        struct NpadGcState
+        // TODO: Come back to GameCube support later
+        /*struct NpadGcState
         {
             uint64_t sampling_number;
             uint64_t buttons;                   // Bitfield of nn::hid::NpadButton
@@ -117,7 +118,7 @@ namespace nn
             JoyconLeft = 1 << 3,
             JoyconRight = 1 << 4,
             GameCube = 1 << 5
-        };
+        };*/
 
         namespace detail
         {
@@ -127,9 +128,10 @@ namespace nn
             void InitializeMouse();
             void GetMouseState(nn::hid::MouseState *);
 
-            void GetSupportedNpadStyleSet(nn::util::BitFlagSet<32,nn::hid::NpadStyleTag> *);
+            // TODO: Come back to GameCube support later
+            /*void GetSupportedNpadStyleSet(nn::util::BitFlagSet<32,nn::hid::NpadStyleTag> *);
             void SetSupportedNpadStyleSet(nn::util::BitFlagSet<32,nn::hid::NpadStyleTag>);
-            void GetNpadStates(int *, nn::hid::NpadGcState *, int, unsigned int const &);
+            void GetNpadStates(int *, nn::hid::NpadGcState *, int, unsigned int const &);*/
         } // namespace detail
     } // namespace hid
 
