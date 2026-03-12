@@ -54,7 +54,7 @@ namespace nn
         public:
             uint32_t flags;
         };
-    }
+    } // namespace util
 
     namespace hid
     {
@@ -193,6 +193,43 @@ namespace nn
         void YieldThread();
         void SleepThread(nn::TimeSpan);
     } // namespace os
+
+    namespace swkbd
+    {
+        enum Trigger : uint32_t
+        {
+            Trigger_Default = 0,
+        };
+
+        struct KeyboardConfig
+        {
+            uint8_t data[0x4D0]; // MakePresetDefault clears 1232 (0x4D0) bytes
+        };
+
+        // From assembly: offsets 0x4D0=workBufPtr, 0x4D8=workBufSize, 0x4F0=dictPtr, 0x4F8=dictSize
+        struct ShowKeyboardArg
+        {
+            KeyboardConfig config;          // 0x000, size 0x4D0
+            void*          workBufPtr;      // 0x4D0
+            uint64_t       workBufSize;     // 0x4D8
+            uint8_t        pad[0x10];       // 0x4E0..0x4EF
+            void*          dictPtr;         // 0x4F0
+            uint64_t       dictSize;        // 0x4F8
+        };
+
+        struct String
+        {
+            char*    ptr;
+            uint64_t capacity; // bytes available, used as read size
+            uint64_t length;   // written back after read, may be char count
+        };
+
+        void MakePresetDefault(KeyboardConfig*);
+        void ShowKeyboard(String*, const ShowKeyboardArg&, Trigger);
+
+        void SetHeaderTextUtf8(KeyboardConfig*, const char*);  // title at top
+        void SetGuideTextUtf8(KeyboardConfig*, const char*);   // placeholder text in input field
+    } // namespace swkbd
 } // namespace nn
 
 // Modules shared between both games...

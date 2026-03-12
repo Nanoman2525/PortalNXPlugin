@@ -792,6 +792,56 @@ void ScaleMouse(nn::hid::MouseState &mouseState)
     }
 }
 
+// Support for software keyboard input
+void GetSWKBInput(char* buf, size_t size, const char *pszHeaderText, const char *pszGuideText)
+{
+    // Set up the menu
+    nn::swkbd::ShowKeyboardArg kbdArg;
+    memset(&kbdArg, 0, sizeof(kbdArg));
+    nn::swkbd::MakePresetDefault(&kbdArg.config);
+    nn::swkbd::SetHeaderTextUtf8(&kbdArg.config, pszHeaderText);
+    nn::swkbd::SetGuideTextUtf8(&kbdArg.config, pszGuideText);
+
+    *reinterpret_cast<uint32_t*>(kbdArg.config.data + 0x3AC) = (uint32_t)(size - 1); // TextMaxLength
+
+    static uint8_t s_KbdWorkBuffer[0x1000] alignas(0x1000);
+    kbdArg.workBufPtr  = s_KbdWorkBuffer;
+    kbdArg.workBufSize = sizeof(s_KbdWorkBuffer);
+
+    char16_t resultBuf[0x7D4 / sizeof(char16_t)] = {};
+    nn::swkbd::String result;
+    result.ptr      = reinterpret_cast<char*>(resultBuf);
+    result.capacity = sizeof(resultBuf);
+
+    nn::swkbd::ShowKeyboard(&result, kbdArg, nn::swkbd::Trigger_Default);
+
+    // UTF8 conversion
+    int out = 0;
+    for (int i = 0; i < (int)(sizeof(resultBuf) / sizeof(char16_t)) && resultBuf[i] != 0 && out < (int)(size - 1); i++)
+    {
+        char16_t c = resultBuf[i];
+        if (c < 0x80)
+        {
+            buf[out++] = (char)c;
+        }
+        else if (c < 0x800)
+        {
+            buf[out++] = (char)(0xC0 | (c >> 6));
+            buf[out++] = (char)(0x80 | (c & 0x3F));
+        }
+        else
+        {
+            buf[out++] = (char)(0xE0 | (c >> 12));
+            buf[out++] = (char)(0x80 | ((c >> 6) & 0x3F));
+            buf[out++] = (char)(0x80 | (c & 0x3F));
+        }
+    }
+    buf[out] = '\0';
+}
+
+static bool s_bGatheringSWKBInput = false;
+static char s_SWKBBuf[512];
+
 bool bShouldExitThread = false;
 void InputThreadMain(void* arg)
 {
@@ -833,6 +883,21 @@ void InputThreadMain(void* arg)
 
             // Check out UserRequestingMovieSkip in engine.rno 0x710035BC00
             // auto CInputSystem__IsButtonDown = (*(bool (**)(void *, ButtonCode_t))(*(uintptr_t *)g_pInputSystem + 112));
+        }
+
+        if (s_bGatheringSWKBInput)
+        {
+            s_bGatheringSWKBInput = false;
+
+            // Note: Currently, this will halt the thread and other input methods until complete
+            GetSWKBInput(s_SWKBBuf, sizeof(s_SWKBBuf), "Console", "Enter command(s) here...");
+
+            if (s_SWKBBuf[0] != '\0')
+            {
+                // Note: Should be thread safe, revisit if we crash consistently from this
+                auto CEngineClient__ClientCmd_Unrestricted = (*(void (**)(void *, const char *))(*(uintptr_t *)engineClient + Offsets::CEngineClient__ClientCmd_Unrestricted_vtable_index));
+                CEngineClient__ClientCmd_Unrestricted(engineClient, s_SWKBBuf);
+            }
         }
 
         nn::os::YieldThread();
@@ -882,6 +947,18 @@ CON_COMMAND(nx_cvar_unhide_all, "Unhide all FCVAR_HIDDEN and FCVAR_DEVELOPMENTON
             pCommand->RemoveFlags( FCVAR_DEVELOPMENTONLY | FCVAR_HIDDEN );
         }
     }
+}
+
+CON_COMMAND(nx_open_on_screen_keyboard, "Execute commands via the on-screen keyboard.")
+{
+    if (s_bGatheringSWKBInput)
+    {
+        return;
+    }
+
+    // Reset the buffer and attempt to get the input
+    memset(s_SWKBBuf, 0, sizeof(s_SWKBBuf));
+    s_bGatheringSWKBInput = true;
 }
 
 // TODO: Come back to GameCube support later

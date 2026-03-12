@@ -41,7 +41,7 @@ DECLARE_OFFSET(CConsolePanel__globalptr, 0x5DA5E0, EMPTY_OFFSET);
 DECLARE_OFFSET(CConsolePanel__ptr_index, 96, EMPTY_OFFSET);
 DECLARE_OFFSET(CConsolePanel__Print_vtable_index, 236, EMPTY_OFFSET);
 
-// client.nro (GameUI.nro for Portal)
+// GameUI.nro (Portal) / client.nro (Portal 2)
 DECLARE_OFFSET(MenuItem__vtable, 0x5A4DE8, 0x14F29C0);
 DECLARE_OFFSET(MenuItem__OnCursorEntered_vtable_index, 103, 104);
 DECLARE_OFFSET(MenuItem__OnCursorExited_vtable_index, 104, 105);
@@ -51,12 +51,15 @@ DECLARE_OFFSET(MenuItem__m_pCascadeMenu, 816, 752);
 DECLARE_OFFSET(Menu__PerformLayout, 1056, 1064);
 DECLARE_OFFSET(Menu__OnCursorExitedMenuItem, 0xE8EA8, 0x715BA0);
 DECLARE_OFFSET(Panel__GetVParent, 312, 320);
+
+// client.nro
 DECLARE_OFFSET(CBaseModFooterPanel__DrawButtonAndText_stub, EMPTY_OFFSET, 0x4DC438);
 DECLARE_OFFSET(LoadingProgress__SetupControlStates_dot_patch, EMPTY_OFFSET, 0x5155D4);
 
 // engine.nro
 DECLARE_OFFSET(Plat_FloatTime, 0x3ABAE0, 0x4C16F0);
 DECLARE_OFFSET(CEngineClient__vtable, 0x75FB00, 0x921BC8);
+DECLARE_OFFSET(CEngineClient__ClientCmd_Unrestricted_vtable_index, 840, 856);
 DECLARE_OFFSET(CEngineClient__GetMouseDelta_vtable_index, 126, 160);
 DECLARE_OFFSET(CGameServer__vtable, EMPTY_OFFSET, 0x996238);
 DECLARE_OFFSET(CGameServer__SetMaxClients_vtable_index, EMPTY_OFFSET, 39);
