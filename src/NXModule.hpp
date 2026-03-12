@@ -56,6 +56,11 @@ namespace nn
         };
     } // namespace util
 
+    struct Result
+    {
+        uint32_t value;
+    };
+
     namespace hid
     {
         struct KeyboardState
@@ -81,6 +86,30 @@ namespace nn
         {
             int32_t x;
             int32_t y;
+        };
+
+        // 0x38 bytes per touch confirmed
+        struct TouchState
+        {
+            int64_t    samplingNumber;  // +0x00
+            int32_t    count;           // +0x08
+            uint8_t    _pad[4];         // +0x0C
+            int64_t    unk10;           // +0x10
+            uint32_t   unk18;           // +0x18
+            uint32_t   unk1C;           // +0x1C
+            int32_t    x;               // +0x20
+            int32_t    y;               // +0x24
+            int32_t    unk28;           // +0x28
+            int32_t    unk2C;           // +0x2C
+            int32_t    unk30;           // +0x30
+            uint8_t    _pad2[4];        // +0x34
+        };
+        static_assert(sizeof(TouchState) == 0x38, "bad size");
+
+        template<size_t N>
+        struct TouchScreenState
+        {
+            TouchState touches[N];  // array starts at offset 0
         };
 
         // TODO: Come back to GameCube support later
@@ -122,11 +151,12 @@ namespace nn
 
         namespace detail
         {
-            void InitializeKeyboard();
             void GetKeyboardState(nn::hid::KeyboardState *);
 
-            void InitializeMouse();
             void GetMouseState(nn::hid::MouseState *);
+
+            template <size_t N>
+            nn::Result GetTouchScreenState(nn::hid::TouchScreenState<N>* state);
 
             // TODO: Come back to GameCube support later
             /*void GetSupportedNpadStyleSet(nn::util::BitFlagSet<32,nn::hid::NpadStyleTag> *);

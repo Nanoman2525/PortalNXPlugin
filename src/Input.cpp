@@ -7,6 +7,7 @@
 
 Variable nx_enable_keyboard_support("nx_enable_keyboard_support", "0", "On Switch, enables keyboard input reading.", FCVAR_NONE);
 Variable nx_enable_mouse_support("nx_enable_mouse_support", "0", "On Switch, enables mouse input reading.", FCVAR_NONE);
+Variable nx_enable_touchscreen_support("nx_enable_touchscreen_support", "0", "On Switch, enables touchscreen input reading.", FCVAR_NONE);
 
 struct InputEvent_t
 {
@@ -883,6 +884,26 @@ void InputThreadMain(void* arg)
 
             // Check out UserRequestingMovieSkip in engine.rno 0x710035BC00
             // auto CInputSystem__IsButtonDown = (*(bool (**)(void *, ButtonCode_t))(*(uintptr_t *)g_pInputSystem + 112));
+        }
+
+        if (nx_enable_touchscreen_support.GetBool())
+        {
+            nn::hid::TouchScreenState<1> state;
+            nn::hid::detail::GetTouchScreenState(&state);
+
+            static bool s_bWasTouching = false;
+
+            bool touching = state.touches[0].count > 0;
+            bool justReleased = s_bWasTouching && !touching;
+
+            if (justReleased && !s_bGatheringSWKBInput)
+            {
+                // Reset the buffer and attempt to get the input
+                memset(s_SWKBBuf, 0, sizeof(s_SWKBBuf));
+                s_bGatheringSWKBInput = true;
+            }
+
+            s_bWasTouching = touching;
         }
 
         if (s_bGatheringSWKBInput)
