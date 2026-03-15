@@ -6,6 +6,7 @@
 
 void *g_pCVar = nullptr;
 void *g_pInputSystem = nullptr;
+void *g_pLauncherMgr = nullptr;
 void *g_GameMovement = nullptr;
 void *engineClient = nullptr;
 
@@ -39,6 +40,7 @@ bool CPlugin::Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn gameSer
 	}
 
 	g_pInputSystem = interfaceFactory("InputSystemVersion001", nullptr);
+	g_pLauncherMgr = interfaceFactory("SDLMgrInterface001", nullptr);
 	g_GameMovement = gameServerFactory("GameMovement001", nullptr);
 
 	if (this->m_bIsGamePortal2)
@@ -73,11 +75,11 @@ bool CPlugin::Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn gameSer
 		nx_max_players_override.Unregister();
 	}
 
-	void ToggleVTableDetours(bool bPatching);
-	ToggleVTableDetours(true);
-
 	void InitNXInput(bool bIsPortal2Build);
 	InitNXInput(this->m_bIsGamePortal2);
+
+	void ToggleVTableDetours(bool bPatching);
+	ToggleVTableDetours(true);
 
 	return true;
 }

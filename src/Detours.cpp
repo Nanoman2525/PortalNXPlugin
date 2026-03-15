@@ -4,6 +4,12 @@
 #include "Plugin.hpp"
 #include "Command.hpp"
 
+extern Variable nx_enable_mouse_support;
+extern void ScaleMouse(nn::hid::MouseState &mouseState);
+
+extern void *g_GameMovement;
+extern void *g_pLauncherMgr;
+
 // Simple defines to make it easier to create a hook a function.
 #define DECLARE_HOOK_FUNC( returnType, FuncName, ... ) \
 static returnType(*FuncName##_Original)(__VA_ARGS__) = nullptr; \
@@ -44,8 +50,6 @@ void ToggleDetour(void* targetAddress, T& original, T detour, bool enable)
 //---------------------------------------------------------------------------------
 // Purpose: Enable in-game mouse movement reading from the Switch. (Excludes menus)
 //---------------------------------------------------------------------------------
-extern Variable nx_enable_mouse_support;
-extern void ScaleMouse(nn::hid::MouseState &mouseState);
 DECLARE_MEMBER_HOOK_FUNC( void, CEngineClient, GetMouseDelta, void *thisptr, int &x, int &y, bool bIgnoreNextMouseDelta )
 {
     if (nx_enable_mouse_support.GetBool())
@@ -70,6 +74,28 @@ DECLARE_MEMBER_HOOK_FUNC( void, CEngineClient, GetMouseDelta, void *thisptr, int
     {
         CEngineClient__GetMouseDelta_Original(thisptr, x, y, bIgnoreNextMouseDelta);
     }
+}
+
+DECLARE_MEMBER_HOOK_FUNC( void, CSDLMgr, PumpWindowsMessageLoop, void *thisptr )
+{
+    // Thought process possibly for later...
+    // In order to hook up to CInputSystem::PollInputState_Linux, we need to
+    // register a CCocoaEvent. But to do that, we need to make sure SDL actually works.
+
+    // Update: Now that we have confirmed SDL is actually polling and running the
+    // background, we can add our own polling for other inputs schemes, like how
+    // Valve calls SDL_AddEventWatch(JoystickSDLWatcher, this); in another func.
+
+    // Then, we can theoretically revamp basically half of Input.cpp, since all we need to do
+    // is tell SDL, "Hey, we have a new input.", which will automatically parse it for us
+    // to how the engine can recognize it (Mouse logic seems to be intact sorta).
+    // We might still need to fix CEngineClient::GetMouseDelta and just point it back to
+    // SDL, since apparently they disconnected it.
+
+    void NXInputLoop();
+    NXInputLoop();
+
+    CSDLMgr__PumpWindowsMessageLoop_Original(thisptr);
 }
 
 //---------------------------------------------------------------------------------
@@ -180,7 +206,6 @@ DECLARE_HOOK_FUNC(int, vsnprintf, char *s, size_t maxlen, const char *format, __
 //---------------------------------------------------------------------------------
 // Purpose: Hook to allow using ladders for all players.
 //---------------------------------------------------------------------------------
-extern void *g_GameMovement;
 Variable nx_enable_ladders("nx_enable_ladders", "0", "Enables ladder usage for all players.");
 DECLARE_MEMBER_HOOK_FUNC(bool, CPortalGameMovement, GameHasLadders)
 {
@@ -320,6 +345,9 @@ void ToggleVTableDetours( bool bPatching )
 
     // We need this detour to actually fire double mouse click events since they normally don't work for some reason
     ToggleDetour(VTABLE_FUNC_ADDRESS(vgui2nrobase, Offsets::CInputSystem__vtable, Offsets::CInputSystem__InternalMousePressed_vtable_index), CInputSystem__InternalMousePressed_Original, CInputSystem__InternalMousePressed_Hook, bPatching);
+
+    // Allow us to hook into the main input system thread
+    ToggleDetour(&(*reinterpret_cast<void ***>(g_pLauncherMgr))[Offsets::CSDLMgr__PumpWindowsMessageLoop_vtable_index], CSDLMgr__PumpWindowsMessageLoop_Original, CSDLMgr__PumpWindowsMessageLoop_Hook, bPatching);
 
     // Hook to fix cursor crash on menu option hover
     if (!g_Plugin.IsGamePortal2())

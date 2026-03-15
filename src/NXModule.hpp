@@ -178,52 +178,6 @@ namespace nn
         }
     };
 
-    namespace os
-    {
-        namespace detail
-        {
-            class InternalCriticalSection
-            {
-                uint32_t Image;
-            };
-
-            class InternalConditionVariable
-            {
-                uint32_t Image;
-            };
-        }  // namespace detail
-
-        struct ThreadType
-        {
-            uint8_t _0[0x40];
-            uint32_t State;
-            bool _44;
-            bool _45;
-            uint8_t _46;
-            uint32_t PriorityBase;
-            void* StackBase;
-            void* Stack;
-            size_t StackSize;
-            void* Arg;
-            uint64_t ThreadFunc;
-            uint8_t _88[0x100];
-            char Name[0x20];
-            detail::InternalCriticalSection Crit;
-            detail::InternalConditionVariable Condvar;
-            uint32_t Handle;
-            uint8_t padding[0x18];
-
-            ThreadType(){};
-        };
-
-        uint32_t CreateThread(nn::os::ThreadType*, void (*)(void*), void*, void*, uint64_t, int32_t, int32_t);
-        void StartThread(nn::os::ThreadType*);
-        void DestroyThread(nn::os::ThreadType*);
-        void WaitThread(nn::os::ThreadType *);
-        void YieldThread();
-        void SleepThread(nn::TimeSpan);
-    } // namespace os
-
     namespace swkbd
     {
         enum Trigger : uint32_t

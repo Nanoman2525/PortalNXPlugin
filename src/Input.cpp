@@ -843,92 +843,76 @@ void GetSWKBInput(char* buf, size_t size, const char *pszHeaderText, const char 
 static bool s_bGatheringSWKBInput = false;
 static char s_SWKBBuf[512];
 
-bool bShouldExitThread = false;
-void InputThreadMain(void* arg)
+void NXInputLoop()
 {
-    while (!bShouldExitThread)
+    if (nx_enable_keyboard_support.GetBool())
     {
-        if (g_pInputSystem)
+        nn::hid::KeyboardState kbState;
+        nn::hid::detail::GetKeyboardState(&kbState);
+
+        // Translate button keys to binds and such for in-game use
+        static nn::hid::KeyboardState prevKBKeys;
+        ProcessKeyboardState(kbState, prevKBKeys);
+
+        // Translate button keys into actual characters that can be used to type in menus
+        static uint64_t prevKBTypingInput = 0;
+        ProcessKeyboardTypingInput(kbState, prevKBTypingInput);
+    }
+
+    if (nx_enable_mouse_support.GetBool())
+    {
+        nn::hid::MouseState mouseState;
+        nn::hid::detail::GetMouseState(&mouseState);
+
+        // Note: These mouse values are only ever consistent with the handheld screen size resolution
+        // Make it work properly when docked
+        ScaleMouse(mouseState);
+
+        // Translate button keys to binds and such for in-game use
+        ProcessMouseState(mouseState);
+
+        // TODO: Something stemming from Menu::OnCursorEnteredMenuItem crashes for some reason when hovering over menu options
+        // Updated note: Fixed through the detours
+
+        // The last mouse process is found in Detours.cpp
+    }
+
+    if (nx_enable_touchscreen_support.GetBool())
+    {
+        nn::hid::TouchScreenState<1> state;
+        nn::hid::detail::GetTouchScreenState(&state);
+
+        static bool s_bWasTouching = false;
+
+        bool touching = state.touches[0].count > 0;
+        bool justReleased = s_bWasTouching && !touching;
+
+        if (justReleased && !s_bGatheringSWKBInput)
         {
-            if (nx_enable_keyboard_support.GetBool())
-            {
-                nn::hid::KeyboardState kbState;
-                nn::hid::detail::GetKeyboardState(&kbState);
-
-                // Translate button keys to binds and such for in-game use
-                static nn::hid::KeyboardState prevKBKeys;
-                ProcessKeyboardState(kbState, prevKBKeys);
-
-                // Translate button keys into actual characters that can be used to type in menus
-                static uint64_t prevKBTypingInput = 0;
-                ProcessKeyboardTypingInput(kbState, prevKBTypingInput);
-            }
-
-            if (nx_enable_mouse_support.GetBool())
-            {
-                nn::hid::MouseState mouseState;
-                nn::hid::detail::GetMouseState(&mouseState);
-
-                // Note: These mouse values are only ever consistent with the handheld screen size resolution
-                // Make it work properly when docked
-                ScaleMouse(mouseState);
-
-                // Translate button keys to binds and such for in-game use
-                ProcessMouseState(mouseState);
-
-                // TODO: Something stemming from Menu::OnCursorEnteredMenuItem crashes for some reason when hovering over menu options
-                // Updated note: Fixed through the detours
-
-                // The last mouse process is found in Detours.cpp
-            }
-
-            // Check out UserRequestingMovieSkip in engine.rno 0x710035BC00
-            // auto CInputSystem__IsButtonDown = (*(bool (**)(void *, ButtonCode_t))(*(uintptr_t *)g_pInputSystem + 112));
+            // Reset the buffer and attempt to get the input
+            memset(s_SWKBBuf, 0, sizeof(s_SWKBBuf));
+            s_bGatheringSWKBInput = true;
         }
 
-        if (nx_enable_touchscreen_support.GetBool())
+        s_bWasTouching = touching;
+    }
+
+    if (s_bGatheringSWKBInput)
+    {
+        s_bGatheringSWKBInput = false;
+
+        // Note: Currently, this will halt the thread and other input methods until complete
+        GetSWKBInput(s_SWKBBuf, sizeof(s_SWKBBuf), "Console", "Enter command(s) here...");
+
+        if (s_SWKBBuf[0] != '\0')
         {
-            nn::hid::TouchScreenState<1> state;
-            nn::hid::detail::GetTouchScreenState(&state);
-
-            static bool s_bWasTouching = false;
-
-            bool touching = state.touches[0].count > 0;
-            bool justReleased = s_bWasTouching && !touching;
-
-            if (justReleased && !s_bGatheringSWKBInput)
-            {
-                // Reset the buffer and attempt to get the input
-                memset(s_SWKBBuf, 0, sizeof(s_SWKBBuf));
-                s_bGatheringSWKBInput = true;
-            }
-
-            s_bWasTouching = touching;
+            // Note: Should be thread safe, revisit if we crash consistently from this
+            auto CEngineClient__ClientCmd_Unrestricted = (*(void (**)(void *, const char *))(*(uintptr_t *)engineClient + Offsets::CEngineClient__ClientCmd_Unrestricted_vtable_index));
+            CEngineClient__ClientCmd_Unrestricted(engineClient, s_SWKBBuf);
         }
-
-        if (s_bGatheringSWKBInput)
-        {
-            s_bGatheringSWKBInput = false;
-
-            // Note: Currently, this will halt the thread and other input methods until complete
-            GetSWKBInput(s_SWKBBuf, sizeof(s_SWKBBuf), "Console", "Enter command(s) here...");
-
-            if (s_SWKBBuf[0] != '\0')
-            {
-                // Note: Should be thread safe, revisit if we crash consistently from this
-                auto CEngineClient__ClientCmd_Unrestricted = (*(void (**)(void *, const char *))(*(uintptr_t *)engineClient + Offsets::CEngineClient__ClientCmd_Unrestricted_vtable_index));
-                CEngineClient__ClientCmd_Unrestricted(engineClient, s_SWKBBuf);
-            }
-        }
-
-        nn::os::YieldThread();
-        nn::os::SleepThread(nn::TimeSpan::FromNanoSeconds(10'000'000)); // Run every 0.01 second
     }
 }
 
-nn::os::ThreadType g_InputThreadType;
-
-extern "C" void *memalign(size_t alignment, size_t size);
 void InitNXInput(bool bIsPortal2Build)
 {
     if (bIsPortal2Build)
@@ -937,20 +921,6 @@ void InitNXInput(bool bIsPortal2Build)
         IE_KeyTyped = 202;
         IE_KeyCodeTyped = 203;
     }
-
-    const size_t stackSize = 0x3000;
-    void *threadStack = memalign(0x1000, stackSize);
-
-    bShouldExitThread = false;
-    nn::os::CreateThread(&g_InputThreadType, InputThreadMain, nullptr, threadStack, stackSize, 16, 0);
-    nn::os::StartThread(&g_InputThreadType);
-}
-
-void ShutdownNXInput()
-{
-    bShouldExitThread = true;
-    nn::os::WaitThread(&g_InputThreadType);
-    nn::os::DestroyThread(&g_InputThreadType);
 }
 
 extern "C" void Msg( const char* pMsg, ... );

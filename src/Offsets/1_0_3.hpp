@@ -70,6 +70,9 @@ DECLARE_OFFSET(CInputSystem__GetPollTick, 80, 104);
 DECLARE_OFFSET(CInputSystem__PostUserEvent, 152, 176);
 DECLARE_OFFSET(CInputSystem__m_nLastSampleTick, 3464, 14064);
 
+// launcher.nro
+DECLARE_OFFSET(CSDLMgr__PumpWindowsMessageLoop_vtable_index, 15, 19);
+
 // server.nro
 DECLARE_OFFSET(CPortalGameMovement__CheckJumpButton_autojump, 0x3733A4, 0x5DD858);
 DECLARE_OFFSET(CPortal_Base2D__NewLocation_reportal, EMPTY_OFFSET, 0x5CF8CC);
