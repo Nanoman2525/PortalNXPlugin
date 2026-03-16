@@ -91,8 +91,8 @@ void CPlugin::Unload()
 		return;
 	}
 
-	void ShutdownNXInput();
-	ShutdownNXInput();
+	void ShutdownNXInput(bool bIsPortal2Build);
+	ShutdownNXInput(this->m_bIsGamePortal2);
 
 	void ToggleVTableDetours(bool bPatching);
 	ToggleVTableDetours(false);

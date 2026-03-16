@@ -72,6 +72,7 @@ DECLARE_OFFSET(CInputSystem__m_nLastSampleTick, 3464, 14064);
 
 // launcher.nro
 DECLARE_OFFSET(CSDLMgr__PumpWindowsMessageLoop_vtable_index, 15, 19);
+DECLARE_OFFSET(CSDLMgr__PostEvent, 0xF734, 0x13A88);
 
 // server.nro
 DECLARE_OFFSET(CPortalGameMovement__CheckJumpButton_autojump, 0x3733A4, 0x5DD858);

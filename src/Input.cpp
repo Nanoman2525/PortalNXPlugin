@@ -5,6 +5,8 @@
 
 #include "Variable.hpp"
 
+extern "C" void Msg( const char* pMsg, ... );
+
 Variable nx_enable_keyboard_support("nx_enable_keyboard_support", "0", "On Switch, enables keyboard input reading.", FCVAR_NONE);
 Variable nx_enable_mouse_support("nx_enable_mouse_support", "0", "On Switch, enables mouse input reading.", FCVAR_NONE);
 Variable nx_enable_touchscreen_support("nx_enable_touchscreen_support", "0", "On Switch, enables touchscreen input reading.", FCVAR_NONE);
@@ -19,6 +21,8 @@ struct InputEvent_t
 };
 
 extern void *g_pInputSystem;
+extern void *g_pLauncherMgr;
+extern void *engineClient;
 
 const int IE_ButtonPressed = 0;
 const int IE_ButtonReleased = 1;
@@ -629,145 +633,21 @@ void ProcessKeyboardTypingInput(const nn::hid::KeyboardState& kbState, uint64_t&
     prevKBTypingInput = kbState.keys[0];
 }
 
-// A remake of CInputSystem::UpdateMousePositionState
-void MouseMove(const nn::hid::MouseState &mouseState)
+#pragma region MOUSE_INPUT
+class CCocoaEvent
 {
-    short x = mouseState.x;
-    short y = mouseState.y;
+public:
+	int             m_EventType;
+	int             m_VirtualKeyCode;
+	wchar_t         m_UnicodeKey;
+	wchar_t         m_UnicodeKeyUnmodified;
+	unsigned int    m_ModifierKeyMask;
+	int             m_MousePos[2];
+	int             m_MouseButtonFlags;
+	unsigned int    m_nMouseClickCount;
+	int             m_MouseButton;
+};
 
-    // Constants
-    const int MOUSE_X = 0;
-    const int MOUSE_Y = 1;
-    const int MOUSE_XY = 2;
-
-    // ---- Questionable start
-
-    // Calculate offsets based on InputState_t structure (some lazy guesswork)
-    const uintptr_t inputStateOffset = 8264;
-
-    // More lazy guesswork
-    const uintptr_t buttonStateSize = (104 + 31) / 32 * 4; // 104 = BUTTON_CODE_LAST, round up to nearest 32
-    uintptr_t buttonTickArraySize = (g_Plugin.IsGamePortal2()) ? (208 * sizeof(int)) : 630 * sizeof(int); // For both pressed and released ticks
-    const uintptr_t analogDeltaOffset = inputStateOffset + buttonStateSize + buttonTickArraySize;
-    const uintptr_t analogValueOffset = (g_Plugin.IsGamePortal2()) ? (analogDeltaOffset + (32 * sizeof(int))) : (analogDeltaOffset + (28 * sizeof(int))); // 32/28 = ANALOG_CODE_LAST
-
-    // ---- Questionable end
-
-    // Get pointers to the arrays
-    int* pAnalogDelta = reinterpret_cast<int*>(reinterpret_cast<uintptr_t>(g_pInputSystem) + analogDeltaOffset);
-    int* pAnalogValue = reinterpret_cast<int*>(reinterpret_cast<uintptr_t>(g_pInputSystem) + analogValueOffset);
-
-    // Store old values
-    int nOldX = pAnalogValue[MOUSE_X];
-    int nOldY = pAnalogValue[MOUSE_Y];
-
-    // Update values and calculate deltas
-    pAnalogValue[MOUSE_X] = x;
-    pAnalogValue[MOUSE_Y] = y;
-    pAnalogDelta[MOUSE_X] = pAnalogValue[MOUSE_X] - nOldX;
-    pAnalogDelta[MOUSE_Y] = pAnalogValue[MOUSE_Y] - nOldY;
-
-    // Get last sample tick
-    int CInputSystem__m_nLastSampleTick = *(int *)((uintptr_t)g_pInputSystem + Offsets::CInputSystem__m_nLastSampleTick);
-
-    if (pAnalogDelta[MOUSE_X] != 0)
-    {
-        PostUserEvent(IE_AnalogValueChanged, MOUSE_X, pAnalogValue[MOUSE_X], pAnalogDelta[MOUSE_X], CInputSystem__m_nLastSampleTick);
-    }
-
-    if (pAnalogDelta[MOUSE_Y] != 0)
-    {
-        PostUserEvent(IE_AnalogValueChanged, MOUSE_Y, pAnalogValue[MOUSE_Y], pAnalogDelta[MOUSE_Y], CInputSystem__m_nLastSampleTick);
-    }
-
-    if (pAnalogDelta[MOUSE_X] != 0 || pAnalogDelta[MOUSE_Y] != 0)
-    {
-        PostUserEvent(IE_AnalogValueChanged, MOUSE_XY, pAnalogValue[MOUSE_X], pAnalogValue[MOUSE_Y], CInputSystem__m_nLastSampleTick);
-    }
-}
-
-void ProcessMouseState(const nn::hid::MouseState& mouseState)
-{
-    // https://switchbrew.org/wiki/HID_services#MouseButton
-    static const struct { int buttonCode; uint32_t bitMask; } mouseButtonMap[] = {
-        { MOUSE_LEFT, 1 }, { MOUSE_MIDDLE, 2 }, { MOUSE_RIGHT, 4 }, { MOUSE_5, 8 }, { MOUSE_4, 16 }
-    };
-
-    static uint32_t prevMouseState = 0;
-    static bool wasMouseButtonPressed[MOUSE_COUNT] = { false };
-
-    // Process mouse buttons
-    for (size_t i = 0; i < sizeof(mouseButtonMap) / sizeof(mouseButtonMap[0]); i++)
-    {
-        int buttonCode = mouseButtonMap[i].buttonCode;
-        uint32_t buttonBitMask = mouseButtonMap[i].bitMask;
-
-        // Check if the button state has changed
-        bool currentState = (mouseState.Buttons & buttonBitMask) != 0;
-        bool previousState = (prevMouseState & buttonBitMask) != 0;
-
-        if (currentState != previousState)
-        {
-            // Update the bit in the previous state
-            if (currentState)
-                prevMouseState |= buttonBitMask;
-            else
-                prevMouseState &= ~buttonBitMask;
-
-            if (currentState)
-            {
-                if (!wasMouseButtonPressed[buttonCode - MOUSE_FIRST])
-                {
-                    wasMouseButtonPressed[buttonCode - MOUSE_FIRST] = true;
-
-                    PostUserEvent(IE_ButtonPressed, buttonCode, buttonCode); // m_nData2 is what allows this to interact with vgui
-                }
-
-                // Note: When it comes to double clicking, it straight up does not fire the function even when I tried setting it up correctly
-                // It will be activated through a detour
-            }
-            else
-            {
-                if (wasMouseButtonPressed[buttonCode - MOUSE_FIRST])
-                {
-                    wasMouseButtonPressed[buttonCode - MOUSE_FIRST] = false;
-
-                    PostUserEvent(IE_ButtonReleased, buttonCode, buttonCode); // m_nData2 is what allows this to interact with vgui
-                }
-            }
-        }
-    }
-
-    // Handle mouse wheel events
-    if (mouseState.wheelDeltaY != 0)
-    {
-        if (mouseState.wheelDeltaY > 0)
-        {
-            PostUserEvent(IE_ButtonPressed, MOUSE_WHEEL_UP);
-            PostUserEvent(IE_ButtonReleased, MOUSE_WHEEL_UP);
-        }
-        else if (mouseState.wheelDeltaY < 0)
-        {
-            PostUserEvent(IE_ButtonPressed, MOUSE_WHEEL_DOWN);
-            PostUserEvent(IE_ButtonReleased, MOUSE_WHEEL_DOWN);
-        }
-
-        // Note: There is no member var that gives us the analog value of the mouse wheel itself, so will make a var that does it
-        // See CocoaEvent_MouseScroll in CInputSystem::PollInputState_Linux
-        const int MOUSE_WHEEL = 3;
-        static int prevMouseWheelAnalog = 0; // Just set it to 0 by default
-        prevMouseWheelAnalog += mouseState.wheelDeltaY;
-        PostUserEvent(IE_AnalogValueChanged, MOUSE_WHEEL, prevMouseWheelAnalog, mouseState.wheelDeltaY); // This is what allows us to interact with vgui
-    }
-
-    // Process mouse movement (Taken from CInputSystem::UpdateMousePositionState)
-    // Update: Turns out they optimized a check for m_rawinput in CInput::GetAccumulatedMouseDeltasAndResetAccumulators, so it's impossible to hook it up with inputsystem lol
-    // The solution: Hook CEngineClient::GetMouseDelta and return the actual delta values of the mouse since that will be called from a bit earlier in CInput::AccumulateMouse
-    MouseMove(mouseState);
-    PostUserEvent(IE_LocateMouseClick, mouseState.x, mouseState.y); // Updates the in-game cursor position for menus
-}
-
-extern void *engineClient;
 void ScaleMouse(nn::hid::MouseState &mouseState)
 {
     // Docked:      x: 1920, y: 1080
@@ -792,6 +672,111 @@ void ScaleMouse(nn::hid::MouseState &mouseState)
         mouseState.y = static_cast<int>(mouseState.y * heightScale);
     }
 }
+
+void ProcessMouseState(const nn::hid::MouseState& mouseState)
+{
+    {
+        // https://switchbrew.org/wiki/HID_services#MouseButton
+        static const struct { int buttonCode; uint32_t bitMask; } mouseButtonMap[] = {
+            { MOUSE_LEFT, 1 }, { MOUSE_MIDDLE, 2 }, { MOUSE_RIGHT, 4 }, { MOUSE_5, 8 }, { MOUSE_4, 16 }
+        };
+
+        static uint32_t prevMouseState = 0;
+        static bool wasMouseButtonPressed[MOUSE_COUNT] = { false };
+
+        // Process mouse buttons
+        for (size_t i = 0; i < sizeof(mouseButtonMap) / sizeof(mouseButtonMap[0]); i++)
+        {
+            int buttonCode = mouseButtonMap[i].buttonCode;
+            uint32_t buttonBitMask = mouseButtonMap[i].bitMask;
+
+            // Check if the button state has changed
+            bool currentState = (mouseState.Buttons & buttonBitMask) != 0;
+            bool previousState = (prevMouseState & buttonBitMask) != 0;
+
+            if (currentState != previousState)
+            {
+                // Update the bit in the previous state
+                if (currentState)
+                    prevMouseState |= buttonBitMask;
+                else
+                    prevMouseState &= ~buttonBitMask;
+
+                if (currentState)
+                {
+                    if (!wasMouseButtonPressed[buttonCode - MOUSE_FIRST])
+                    {
+                        wasMouseButtonPressed[buttonCode - MOUSE_FIRST] = true;
+
+                        PostUserEvent(IE_ButtonPressed, buttonCode, buttonCode); // m_nData2 is what allows this to interact with vgui
+                    }
+
+                    // Note: When it comes to double clicking, it straight up does not fire the function even when I tried setting it up correctly
+                    // It will be activated through a detour
+                }
+                else
+                {
+                    if (wasMouseButtonPressed[buttonCode - MOUSE_FIRST])
+                    {
+                        wasMouseButtonPressed[buttonCode - MOUSE_FIRST] = false;
+
+                        PostUserEvent(IE_ButtonReleased, buttonCode, buttonCode); // m_nData2 is what allows this to interact with vgui
+                    }
+                }
+            }
+        }
+
+        // TODO: Rework the above area and feed it into the cocoa system. This way, we can possibly eliminate the double click detour hack.
+        // CCocoaEvent theEvent;
+        // theEvent.m_EventType = (bPressed) ? 2 : 4; // CocoaEvent_MouseButtonDown : CocoaEvent_MouseButtonUp
+        // theEvent.m_MouseButtonFlags = m_mouseButtons;
+        // theEvent.m_nMouseClickCount = bDoublePress ? 2 : 1;
+        // theEvent.m_MouseButton = cocoaButton;
+        // PostEvent( theEvent );
+    }
+
+    auto CSDLMgr__PostEvent = (void (*)(void *, const CCocoaEvent&))(launchernrobase + Offsets::CSDLMgr__PostEvent);
+
+    // CSDLMgr::PumpWindowsMessageLoop case SDL_MOUSEWHEEL
+    if (mouseState.wheelDeltaY != 0)
+    {
+        int scroll = mouseState.wheelDeltaY;
+
+        if (scroll)
+        {
+            CCocoaEvent event{};
+            event.m_EventType = 6; // CocoaEvent_MouseScroll
+            event.m_MousePos[0] = scroll;
+            event.m_MousePos[1] = scroll;
+
+            CSDLMgr__PostEvent(g_pLauncherMgr, event);
+        }
+    }
+
+    // CSDLMgr::PumpWindowsMessageLoop case SDL_MOUSEMOTION
+    if (*reinterpret_cast<bool *>((uintptr_t)g_pLauncherMgr + 41)) // CSDLMgr::m_bHasFocus
+    {
+        // Updates the deltas so that the in-game input can track it
+        static int32_t oldx = 0;
+        static int32_t oldy = 0;
+
+        *(int *)((uintptr_t)g_pLauncherMgr + 48) += (oldx - mouseState.x) * -1; // CSDLMgr::m_nMouseXDelta
+        *(int *)((uintptr_t)g_pLauncherMgr + 52) += (oldy - mouseState.y) * -1; // CSDLMgr::m_nMouseYDelta
+
+        // Save previous state
+        oldx = mouseState.x;
+        oldy = mouseState.y;
+
+        CCocoaEvent event{};
+        event.m_EventType = 3; // CocoaEvent_MouseMove
+        event.m_MousePos[0] = mouseState.x;
+        event.m_MousePos[1] = mouseState.y;
+        event.m_MouseButtonFlags = mouseState.Buttons;
+
+        CSDLMgr__PostEvent(g_pLauncherMgr, event);
+    }
+}
+#pragma endregion
 
 // Support for software keyboard input
 void GetSWKBInput(char* buf, size_t size, const char *pszHeaderText, const char *pszGuideText)
@@ -843,6 +828,9 @@ void GetSWKBInput(char* buf, size_t size, const char *pszHeaderText, const char 
 static bool s_bGatheringSWKBInput = false;
 static char s_SWKBBuf[512];
 
+// Ideally we would try to hook into the existing existing SDL subsystem.
+// However, it doesn't poll for other peripherals that we want,
+// (except for mouse and even then, only in Portal 2). So we poll it all ourselves.
 void NXInputLoop()
 {
     if (nx_enable_keyboard_support.GetBool())
@@ -923,7 +911,9 @@ void InitNXInput(bool bIsPortal2Build)
     }
 }
 
-extern "C" void Msg( const char* pMsg, ... );
+void ShutdownNXInput(bool bIsPortal2Build)
+{
+}
 
 // Add a copy of Saul's cvar unhiding functionality
 #include "Command.hpp"

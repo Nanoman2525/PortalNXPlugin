@@ -48,50 +48,22 @@ void ToggleDetour(void* targetAddress, T& original, T detour, bool enable)
 }
 
 //---------------------------------------------------------------------------------
-// Purpose: Enable in-game mouse movement reading from the Switch. (Excludes menus)
+// Purpose: Allow us to hook into the main input system thread
+//
+// Thought process possibly for later...
+// In order to hook up to CInputSystem::PollInputState_Linux, we need to
+// register a CCocoaEvent. But to do that, we need to make sure SDL actually works.
+//
+// Update: Now that we have confirmed SDL is actually polling and running the
+// background, we can add our own polling for other inputs schemes, like how
+// Valve calls SDL_AddEventWatch(JoystickSDLWatcher, this); in another func.
+//
+// Then, we can theoretically revamp basically half of Input.cpp, since all we need to do
+// is tell SDL, "Hey, we have a new input.", which will automatically parse it for us
+// to how the engine can recognize it (Mouse logic seems to be intact sorta).
 //---------------------------------------------------------------------------------
-DECLARE_MEMBER_HOOK_FUNC( void, CEngineClient, GetMouseDelta, void *thisptr, int &x, int &y, bool bIgnoreNextMouseDelta )
-{
-    if (nx_enable_mouse_support.GetBool())
-    {
-        nn::hid::MouseState mouseState;
-        nn::hid::detail::GetMouseState(&mouseState);
-
-        // Note: These mouse values are only ever consistent with the handheld screen size resolution
-        // Make it work properly when docked
-        ScaleMouse(mouseState);
-
-        static int32_t oldx = 0;
-        static int32_t oldy = 0;
-
-        x = (oldx - mouseState.x) * -1;
-        y = (oldy - mouseState.y) * -1;
-
-        oldx = mouseState.x;
-        oldy = mouseState.y;
-    }
-    else
-    {
-        CEngineClient__GetMouseDelta_Original(thisptr, x, y, bIgnoreNextMouseDelta);
-    }
-}
-
 DECLARE_MEMBER_HOOK_FUNC( void, CSDLMgr, PumpWindowsMessageLoop, void *thisptr )
 {
-    // Thought process possibly for later...
-    // In order to hook up to CInputSystem::PollInputState_Linux, we need to
-    // register a CCocoaEvent. But to do that, we need to make sure SDL actually works.
-
-    // Update: Now that we have confirmed SDL is actually polling and running the
-    // background, we can add our own polling for other inputs schemes, like how
-    // Valve calls SDL_AddEventWatch(JoystickSDLWatcher, this); in another func.
-
-    // Then, we can theoretically revamp basically half of Input.cpp, since all we need to do
-    // is tell SDL, "Hey, we have a new input.", which will automatically parse it for us
-    // to how the engine can recognize it (Mouse logic seems to be intact sorta).
-    // We might still need to fix CEngineClient::GetMouseDelta and just point it back to
-    // SDL, since apparently they disconnected it.
-
     void NXInputLoop();
     NXInputLoop();
 
@@ -168,6 +140,9 @@ DECLARE_MEMBER_HOOK_FUNC(void, MenuItem, OnCursorEntered, void *thisptr)
     // TODO
 }
 
+//---------------------------------------------------------------------------------
+// Purpose: Hook to fix cursor crash on menu option hover
+//---------------------------------------------------------------------------------
 DECLARE_MEMBER_HOOK_FUNC(void, MenuItem, OnCursorExited, void *thisptr)
 {
     // Note: Forwarding straight to the target func doesn't crash the game, but also doesn't do anything
@@ -339,46 +314,35 @@ DECLARE_MEMBER_HOOK_FUNC(void, CBaseModFooterPanel, OnCommand, void *thisptr, co
 
 void ToggleVTableDetours( bool bPatching )
 {
-	// Enables actual in-game mouse input tracking
-    // In Portal 2, you need to remove the -nomouse launch parm and set cl_mouseenable to 1
-    ToggleDetour(VTABLE_FUNC_ADDRESS(enginenrobase, Offsets::CEngineClient__vtable, Offsets::CEngineClient__GetMouseDelta_vtable_index), CEngineClient__GetMouseDelta_Original, CEngineClient__GetMouseDelta_Hook, bPatching);
+    // Allow us to hook into the main input system thread
+    ToggleDetour(&(*reinterpret_cast<void ***>(g_pLauncherMgr))[Offsets::CSDLMgr__PumpWindowsMessageLoop_vtable_index], CSDLMgr__PumpWindowsMessageLoop_Original, CSDLMgr__PumpWindowsMessageLoop_Hook, bPatching);
 
     // We need this detour to actually fire double mouse click events since they normally don't work for some reason
     ToggleDetour(VTABLE_FUNC_ADDRESS(vgui2nrobase, Offsets::CInputSystem__vtable, Offsets::CInputSystem__InternalMousePressed_vtable_index), CInputSystem__InternalMousePressed_Original, CInputSystem__InternalMousePressed_Hook, bPatching);
 
-    // Allow us to hook into the main input system thread
-    ToggleDetour(&(*reinterpret_cast<void ***>(g_pLauncherMgr))[Offsets::CSDLMgr__PumpWindowsMessageLoop_vtable_index], CSDLMgr__PumpWindowsMessageLoop_Original, CSDLMgr__PumpWindowsMessageLoop_Hook, bPatching);
-
-    // Hook to fix cursor crash on menu option hover
     if (!g_Plugin.IsGamePortal2())
     {
+        // Hook to fix cursor crash on menu option hover
         // Portal has multiple vtables in reference to these functions
         ToggleDetour(VTABLE_FUNC_ADDRESS(GameUInrobase, Offsets::MenuItem__vtable, Offsets::MenuItem__OnCursorEntered_vtable_index), MenuItem__OnCursorEntered_Original, MenuItem__OnCursorEntered_Hook, bPatching);
         ToggleDetour(VTABLE_FUNC_ADDRESS(GameUInrobase, Offsets::MenuItem__vtable, Offsets::MenuItem__OnCursorExited_vtable_index), MenuItem__OnCursorExited_Original, MenuItem__OnCursorExited_Hook, bPatching);
-
         ToggleDetour(VTABLE_FUNC_ADDRESS(GameUInrobase, Offsets::MenuItem__vtable2, Offsets::MenuItem__OnCursorEntered_vtable_index), MenuItem__OnCursorEntered_Original, MenuItem__OnCursorEntered_Hook, bPatching);
         ToggleDetour(VTABLE_FUNC_ADDRESS(GameUInrobase, Offsets::MenuItem__vtable2, Offsets::MenuItem__OnCursorExited_vtable_index), MenuItem__OnCursorExited_Original, MenuItem__OnCursorExited_Hook, bPatching);
-
         ToggleDetour(VTABLE_FUNC_ADDRESS(GameUInrobase, Offsets::CGameMenuItem__vtable, Offsets::MenuItem__OnCursorEntered_vtable_index), MenuItem__OnCursorEntered_Original, MenuItem__OnCursorEntered_Hook, bPatching);
         ToggleDetour(VTABLE_FUNC_ADDRESS(GameUInrobase, Offsets::CGameMenuItem__vtable, Offsets::MenuItem__OnCursorExited_vtable_index), MenuItem__OnCursorExited_Original, MenuItem__OnCursorExited_Hook, bPatching);
-    }
-    else
-    {
-        ToggleDetour(VTABLE_FUNC_ADDRESS(clientnrobase, Offsets::MenuItem__vtable, Offsets::MenuItem__OnCursorEntered_vtable_index), MenuItem__OnCursorEntered_Original, MenuItem__OnCursorEntered_Hook, bPatching);
-        ToggleDetour(VTABLE_FUNC_ADDRESS(clientnrobase, Offsets::MenuItem__vtable, Offsets::MenuItem__OnCursorExited_vtable_index), MenuItem__OnCursorExited_Original, MenuItem__OnCursorExited_Hook, bPatching);
-    }
 
-    // Hook to fix console printing in Portal (No color support yet)
-    if (!g_Plugin.IsGamePortal2())
-    {
+        // Hook to fix console printing in Portal (No color support yet)
         // Patch the GOT entry for the PLT stub
         uintptr_t got_entry_addr = tier0nrobase + Offsets::vsnprintf__got_entry;
         vsnprintf_Original = *(int (**)(char *s, size_t maxlen, const char *format, __gnuc_va_list arg))got_entry_addr;
         *(void **)got_entry_addr = (bPatching) ? (void *)vsnprintf_Hook : (void *)vsnprintf_Original;
     }
-
-    if (g_Plugin.IsGamePortal2())
+    else
     {
+        // Hook to fix cursor crash on menu option hover
+        ToggleDetour(VTABLE_FUNC_ADDRESS(clientnrobase, Offsets::MenuItem__vtable, Offsets::MenuItem__OnCursorEntered_vtable_index), MenuItem__OnCursorEntered_Original, MenuItem__OnCursorEntered_Hook, bPatching);
+        ToggleDetour(VTABLE_FUNC_ADDRESS(clientnrobase, Offsets::MenuItem__vtable, Offsets::MenuItem__OnCursorExited_vtable_index), MenuItem__OnCursorExited_Original, MenuItem__OnCursorExited_Hook, bPatching);
+
         // Hook to allow using ladders for all players
         // Point the target func to the base class's
         ToggleDetour(&(*reinterpret_cast<void ***>(g_GameMovement))[Offsets::CPortalGameMovement__GameHasLadders_vtable_index], CPortalGameMovement__GameHasLadders_Original, CPortalGameMovement__GameHasLadders_Hook, bPatching);
