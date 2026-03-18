@@ -112,43 +112,6 @@ namespace nn
             TouchState touches[N];  // array starts at offset 0
         };
 
-        // TODO: Come back to GameCube support later
-        /*struct NpadGcState
-        {
-            uint64_t sampling_number;
-            uint64_t buttons;                   // Bitfield of nn::hid::NpadButton
-            AnalogStickState analog_stick_l;
-            AnalogStickState analog_stick_r;
-            uint32_t attributes;
-            uint32_t trigger_l;                 // Valid range: 0x0-0x7FFF
-            uint32_t trigger_r;                 // Valid range: 0x0-0x7FFF
-            uint32_t pad;
-        };
-
-        enum NpadIdType
-        {
-            NpadIdType_Player1      = 0,
-            NpadIdType_Player2      = 1,
-            NpadIdType_Player3      = 2,
-            NpadIdType_Player4      = 3,
-            NpadIdType_Player5      = 4,
-            NpadIdType_Player6      = 5,
-            NpadIdType_Player7      = 6,
-            NpadIdType_Player8      = 7,
-            NpadIdType_Other        = 0x10,
-            NpadIdType_Handheld     = 0x20
-        };
-
-        enum NpadStyleTag
-        {
-            ProController = 1 << 0,
-            Handheld = 1 << 1,
-            JoyconPair = 1 << 2,
-            JoyconLeft = 1 << 3,
-            JoyconRight = 1 << 4,
-            GameCube = 1 << 5
-        };*/
-
         namespace detail
         {
             void GetKeyboardState(nn::hid::KeyboardState *);
@@ -157,11 +120,6 @@ namespace nn
 
             template <size_t N>
             nn::Result GetTouchScreenState(nn::hid::TouchScreenState<N>* state);
-
-            // TODO: Come back to GameCube support later
-            /*void GetSupportedNpadStyleSet(nn::util::BitFlagSet<32,nn::hid::NpadStyleTag> *);
-            void SetSupportedNpadStyleSet(nn::util::BitFlagSet<32,nn::hid::NpadStyleTag>);
-            void GetNpadStates(int *, nn::hid::NpadGcState *, int, unsigned int const &);*/
         } // namespace detail
     } // namespace hid
 
