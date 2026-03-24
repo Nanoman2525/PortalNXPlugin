@@ -42,6 +42,7 @@ private:
     // IGameEventListener2
     int 					m_nDebugID;
 
+	bool					m_bAlreadyLoaded;
 	bool					m_bNoUnload;
 	bool 					m_bIsGamePortal2;
 };

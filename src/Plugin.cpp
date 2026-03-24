@@ -25,6 +25,12 @@ CPlugin::~CPlugin()
 
 bool CPlugin::Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn gameServerFactory)
 {
+	if (this->m_bAlreadyLoaded)
+	{
+		this->m_bNoUnload = true;
+		return false;
+	}
+
 	// Figure out which Portal game this is
 	g_pCVar = interfaceFactory("VEngineCvar004", nullptr);
 	if (!g_pCVar)
@@ -80,6 +86,8 @@ bool CPlugin::Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn gameSer
 
 	void ToggleVTableDetours(bool bPatching);
 	ToggleVTableDetours(true);
+
+	this->m_bAlreadyLoaded = true;
 
 	return true;
 }
