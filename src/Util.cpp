@@ -2,8 +2,11 @@
 #include "NXModule.hpp"
 #include "Offsets.hpp"
 #include "Plugin.hpp"
+// #include "Variable.hpp"
 
 extern "C" void Msg( const char* pMsg, ... );
+
+// Variable nx_footer_all_caps("nx_footer_all_caps", "0", "Forces Portal 2 menu footer button text to use caps, like PC.", FCVAR_NONE);
 
 CON_COMMAND(nx_toggle_autojump, "Toggles the autojump ability for all players.")
 {
@@ -140,14 +143,9 @@ CON_COMMAND(nx_toggle_coop_loading_dots, "Shows the coop loading progress on map
 }
 
 extern void *engineClient;
-void UpdateFooterButtons() // TODO: This crashes if there is no button present on the menu, and this is called
+void CBaseModFooterPanel__FixLayout_Restored()
 {
     uintptr_t CBaseModPanel__m_CFactoryBasePanel = *(uintptr_t *)(clientnrobase + 0x1614958); // CBaseModPanel* type
-    if (!CBaseModPanel__m_CFactoryBasePanel)
-    {
-        Msg("No CBaseModPanel::m_CFactoryBasePanel!\n");
-        return;
-    }
 
     // CBaseModFooterPanel *pFooter = BaseModUI::CBaseModPanel::GetSingleton().GetFooterPanel();
     void *g_pVGui = *(void **)(clientnrobase + 0x1641318);
@@ -162,12 +160,6 @@ void UpdateFooterButtons() // TODO: This crashes if there is no button present o
 			pFooter = (*(void *(**)(void *, void *vguiPanel, const char *moduleName))(*(uintptr_t *)g_pVGuiPanel + 448))(g_pVGuiPanel, panel, (const char *)(clientnrobase + 0x171C105)); // ipanel()->GetPanel(panel, GetControlsModuleName());
 		}
 	}
-
-    if (!pFooter)
-    {
-        Msg("No pFooter!\n");
-        return;
-    }
 
     // Member variables of m_FooterPanel
     void **m_pButtons = reinterpret_cast<void **>((uintptr_t)pFooter + 4008);
@@ -210,11 +202,17 @@ void UpdateFooterButtons() // TODO: This crashes if there is no button present o
         return;
 
     char uilanguage[64];
-    (*(void (**)(void *, char *, int))(*(uintptr_t *)engineClient + 736))(engineClient, uilanguage, sizeof(uilanguage));
+    (*(void (**)(void *, char *, int))(*(uintptr_t *)engineClient + 736))(engineClient, uilanguage, sizeof(uilanguage)); // CEngineClient::GetUILanguage
     bool bIsEnglish = ( uilanguage[0] == 0 ) || !strcmp( uilanguage, "english" );
 
     int m_nFooterType = *reinterpret_cast<int *>((uintptr_t)pFooter + 3492);
     void *pFooterData = (void *)(((uintptr_t)pFooter) + 168 * m_nFooterType); // m_FooterData[m_nFooterType]
+
+    // Note: Deviating from the normal code by adding this check to not display if the first button is just "Select", so that it matches up with PC mostly (Can cause crashes)
+    // if (!strcmp("#L4D360UI_Select", *(const char **)((uintptr_t)pFooterData + 3496)))
+    // {
+    //     (*(unsigned int *)((uintptr_t)pFooterData + 3640)) &= ~1; // pFooterData::m_Buttons
+    // }
 
     int x = *(int *)((uintptr_t)pFooterData + 3652); // pFooterData->m_nX;
 
@@ -268,16 +266,6 @@ void UpdateFooterButtons() // TODO: This crashes if there is no button present o
 
         int nButton = buttonOrder[i];
 
-        // Note: Deviating from the normal code by adding this check to not display if the first button is just "Select", so that it matches up with PC
-        int offset = 3496 + (i * 24); // pFooterData->m_AButtonText.Get() actual value to start with
-        const char *buttonText = *(const char **)((uintptr_t)pFooterData + offset); // Offset each text by adding 24 to get to the next one in this order: A, B, X, Y, DPad, LShoulder
-        if ((nButton == 1) && !strcmp("#L4D360UI_Select", buttonText))
-        {
-            // pButton->SetVisible( false );
-            (*(void (**)(void *, bool))(*(uintptr_t *)pButton + 272))(pButton, false); // pFooterData::m_Buttons
-            continue;
-        }
-
         // pButton->SetVisible( ( nButton & pFooterData->m_Buttons ) != 0 );
         (*(void (**)(void *, bool))(*(uintptr_t *)pButton + 272))(pButton, (nButton & (*(unsigned int *)((uintptr_t)pFooterData + 3640))) != 0); // pFooterData::m_Buttons
 
@@ -286,6 +274,21 @@ void UpdateFooterButtons() // TODO: This crashes if there is no button present o
 
         if ( !(nButton & (*(unsigned int *)((uintptr_t)pFooterData + 3640))) ) // pFooterData::m_Buttons
             continue;
+
+        // Note: Simplified version of the text logic
+        int offset = 3496 + (i * 24); // pFooterData->m_AButtonText.Get() actual value to start with
+        const char *buttonText = *(const char **)((uintptr_t)pFooterData + offset); // Offset each text by adding 24 to get to the next one in this order: A, B, X, Y, DPad, LShoulder
+        if (m_Format == 2)
+        {
+            if (nButton == 8)
+            {
+                buttonText = *(const char **)((uintptr_t)pFooterData + offset + 24);
+            }
+            else if (nButton == 4)
+            {
+                buttonText = *(const char **)((uintptr_t)pFooterData + offset - 24);
+            }
+        }
 
         // pButton->SetText
         (*(void (**)(void *, const char *))(*(uintptr_t*)pButton + 1696))(pButton, buttonText);
@@ -305,11 +308,25 @@ void UpdateFooterButtons() // TODO: This crashes if there is no button present o
 
         if (bIsEnglish)
         {
-            // pButton->SetAllCaps( true );
-            *((uintptr_t *)pButton + 638) = true; // m_bAllCaps = true;
-            uintptr_t textImage = *((uintptr_t *)pButton + 67); // thisptr[67] from disassembly
-            *(unsigned char *)(textImage + 80) = (*(unsigned char *)(textImage + 80) & 0xDF) | 32; // _textImage->m_bAllCaps = true;
-            (*(void (**)(void *, bool, bool))(*(uintptr_t *)pButton + 536))(pButton, false, false); // InvalidateLayout( false, false );
+            // Note: Switching back and forth is a bit buggy, so just leave this out
+
+            // pButton->SetAllCaps( true/false );
+
+            // bool bState = nx_footer_all_caps.GetBool(); // Note: Looks better without caps and fits the text boxes much better, so leave it behind a ConVar to toggle it
+            // *((uintptr_t *)pButton + 638) = bState; // m_bAllCaps = true/false;
+
+            // uintptr_t textImage = *((uintptr_t *)pButton + 67); // thisptr[67] from disassembly
+            // unsigned char *p = (unsigned char *)(textImage + 80);
+            // if (bState)
+            // {
+            //     *p |= 32; // _textImage->m_bAllCaps = true;
+            // }
+            // else
+            // {
+            //     *p &= ~32; // _textImage->m_bAllCaps = false;
+            // }
+
+            // (*(void (**)(void *, bool, bool))(*(uintptr_t *)pButton + 536))(pButton, false, false); // InvalidateLayout( false, false );
         }
 
         uint32_t m_TextColor = *reinterpret_cast<uint32_t *>((uintptr_t)pFooter + 4128);
@@ -333,5 +350,5 @@ CON_COMMAND(nx_update_footer_buttons, "Run init logic missing from the game if n
         return;
     }
 
-    UpdateFooterButtons();
+    CBaseModFooterPanel__FixLayout_Restored();
 }
