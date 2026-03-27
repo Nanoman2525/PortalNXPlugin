@@ -2,11 +2,8 @@
 #include "NXModule.hpp"
 #include "Offsets.hpp"
 #include "Plugin.hpp"
-// #include "Variable.hpp"
 
 extern "C" void Msg( const char* pMsg, ... );
-
-// Variable nx_footer_all_caps("nx_footer_all_caps", "0", "Forces Portal 2 menu footer button text to use caps, like PC.", FCVAR_NONE);
 
 CON_COMMAND(nx_toggle_autojump, "Toggles the autojump ability for all players.")
 {
@@ -72,41 +69,6 @@ CON_COMMAND(nx_toggle_floor_reportals, "Toggles the floor reportal ability for a
     }
 }
 
-CON_COMMAND(nx_toggle_menu_controller_button_visibility, "Toggles the visibility of the menu game console helpers on screen.")
-{
-    if (!g_Plugin.IsGamePortal2())
-    {
-        Msg("nx_toggle_menu_controller_button_visibility - Works only on Portal 2 game binaries.\n");
-        return;
-    }
-
-    static uint8_t orig_bytes[4] = { 0 };
-    static bool bPatched = false;
-
-    if (!bPatched)
-    {
-        bPatched = true;
-
-        if (!orig_bytes[0])
-        {
-            memcpy(orig_bytes, (void *)(clientnrobase + Offsets::CBaseModFooterPanel__DrawButtonAndText_stub), sizeof(orig_bytes));
-        }
-
-        uint8_t patch[4] = { 0xE3, 0x00, 0x00, 0x14 }; // Jump to end of function (stub it out)
-        memcpy((void *)(clientnrobase + Offsets::CBaseModFooterPanel__DrawButtonAndText_stub), patch, sizeof(patch));
-
-        Msg("nx_toggle_menu_controller_button_visibility - Patched.\n");
-    }
-    else
-    {
-        bPatched = false;
-
-        memcpy((void *)(clientnrobase + Offsets::CBaseModFooterPanel__DrawButtonAndText_stub), orig_bytes, sizeof(orig_bytes));
-
-        Msg("nx_toggle_menu_controller_button_visibility - Unpatched.\n");
-    }
-}
-
 CON_COMMAND(nx_toggle_coop_loading_dots, "Shows the coop loading progress on map transitions.")
 {
     if (!g_Plugin.IsGamePortal2())
@@ -143,7 +105,7 @@ CON_COMMAND(nx_toggle_coop_loading_dots, "Shows the coop loading progress on map
 }
 
 extern void *engineClient;
-void CBaseModFooterPanel__FixLayout_Restored()
+void CBaseModFooterPanel__FixLayout_Restored(bool bHideAllButtons)
 {
     uintptr_t CBaseModPanel__m_CFactoryBasePanel = *(uintptr_t *)(clientnrobase + 0x1614958); // CBaseModPanel* type
 
@@ -201,6 +163,17 @@ void CBaseModFooterPanel__FixLayout_Restored()
     if ( !*(bool *)((uintptr_t)pFooter + 4144) ) // if ( !m_bInitialized )
         return;
 
+    // Note: Deviating from the normal code by adding this check to see if we want to hide the buttons for cleanup
+    if (bHideAllButtons)
+    {
+        for ( int i = 0; i < 6; i++ )
+        {
+            // m_pButtons[i]->SetVisible( false );
+            (*(void (**)(void *, bool))(*(uintptr_t *)m_pButtons[i] + 272))(m_pButtons[i], false);
+        }
+        return;
+    }
+
     char uilanguage[64];
     (*(void (**)(void *, char *, int))(*(uintptr_t *)engineClient + 736))(engineClient, uilanguage, sizeof(uilanguage)); // CEngineClient::GetUILanguage
     bool bIsEnglish = ( uilanguage[0] == 0 ) || !strcmp( uilanguage, "english" );
@@ -208,16 +181,9 @@ void CBaseModFooterPanel__FixLayout_Restored()
     int m_nFooterType = *reinterpret_cast<int *>((uintptr_t)pFooter + 3492);
     void *pFooterData = (void *)(((uintptr_t)pFooter) + 168 * m_nFooterType); // m_FooterData[m_nFooterType]
 
-    // Note: Deviating from the normal code by adding this check to not display if the first button is just "Select", so that it matches up with PC mostly (Can cause crashes)
-    // if (!strcmp("#L4D360UI_Select", *(const char **)((uintptr_t)pFooterData + 3496)))
-    // {
-    //     (*(unsigned int *)((uintptr_t)pFooterData + 3640)) &= ~1; // pFooterData::m_Buttons
-    // }
-
     int x = *(int *)((uintptr_t)pFooterData + 3652); // pFooterData->m_nX;
 
     // CBaseModFrame *pFrame = BASEMODPANEL_SINGLETON.GetWindow( BASEMODPANEL_SINGLETON.GetActiveWindowType() );
-    // m_bUsesAlternateTiles = ( pFrame && pFrame->UsesAlternateTiles() );
     // See CBaseModPanel::GetBackgroundMovieName for useful offsets
     auto GetActiveWindowType = (int (*)(void *))(clientnrobase + 0x4990F8);
     int activeWindowType = GetActiveWindowType((void *)CBaseModPanel__m_CFactoryBasePanel);
@@ -231,6 +197,8 @@ void CBaseModFooterPanel__FixLayout_Restored()
 			vguiPanel = (*(void *(**)(void *, void *vguiPanel, const char *moduleName))(*(uintptr_t *)g_pVGuiPanel + 448))(g_pVGuiPanel, panel, (const char *)(clientnrobase + 0x171C105)); // ipanel()->GetPanel(panel, GetControlsModuleName());
 		}
 	}
+
+    // m_bUsesAlternateTiles = ( pFrame && pFrame->UsesAlternateTiles() );
     bool m_bUsesAlternateTiles = *(bool *)((uintptr_t)pFooter + 4000);
     m_bUsesAlternateTiles = ( vguiPanel && (*(bool *)((uintptr_t)vguiPanel + 3152)) );
 
@@ -308,24 +276,11 @@ void CBaseModFooterPanel__FixLayout_Restored()
 
         if (bIsEnglish)
         {
-            // Note: Switching back and forth is a bit buggy, so just leave this out
-
-            // pButton->SetAllCaps( true/false );
-
-            // bool bState = nx_footer_all_caps.GetBool(); // Note: Looks better without caps and fits the text boxes much better, so leave it behind a ConVar to toggle it
-            // *((uintptr_t *)pButton + 638) = bState; // m_bAllCaps = true/false;
-
+            // pButton->SetAllCaps( true );
+            // On Switch, it looks much better without caps...
+            // *((uintptr_t *)pButton + 638) = true; // m_bAllCaps = true;
             // uintptr_t textImage = *((uintptr_t *)pButton + 67); // thisptr[67] from disassembly
-            // unsigned char *p = (unsigned char *)(textImage + 80);
-            // if (bState)
-            // {
-            //     *p |= 32; // _textImage->m_bAllCaps = true;
-            // }
-            // else
-            // {
-            //     *p &= ~32; // _textImage->m_bAllCaps = false;
-            // }
-
+            // *(unsigned char *)(textImage + 80) = (*(unsigned char *)(textImage + 80) & 0xDF) | 32; // _textImage->m_bAllCaps = true;
             // (*(void (**)(void *, bool, bool))(*(uintptr_t *)pButton + 536))(pButton, false, false); // InvalidateLayout( false, false );
         }
 
@@ -350,5 +305,5 @@ CON_COMMAND(nx_update_footer_buttons, "Run init logic missing from the game if n
         return;
     }
 
-    CBaseModFooterPanel__FixLayout_Restored();
+    CBaseModFooterPanel__FixLayout_Restored(false);
 }

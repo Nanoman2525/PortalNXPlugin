@@ -221,14 +221,8 @@ DECLARE_MEMBER_HOOK_FUNC(void, CGameServer, SetMaxClients, void *thisptr, int nu
 DECLARE_MEMBER_HOOK_FUNC(void, CBaseModFooterPanel, OnCommand, void *thisptr, const char *pCommand)
 {
     uintptr_t CBaseModPanel__m_CFactoryBasePanel = *(uintptr_t *)(clientnrobase + 0x1614958); // CBaseModPanel* type
-    if (!CBaseModPanel__m_CFactoryBasePanel)
-    {
-        Warning("No CBaseModPanel__m_CFactoryBasePanel in CBaseModFooterPanel::OnCommand hook!\n");
-        return;
-    }
 
     // CBaseModFrame *pFrame = BASEMODPANEL_SINGLETON.GetWindow( BASEMODPANEL_SINGLETON.GetActiveWindowType() );
-    // m_bUsesAlternateTiles = ( pFrame && pFrame->UsesAlternateTiles() );
     // See CBaseModPanel::GetBackgroundMovieName for useful offsets
     auto GetActiveWindowType = (int (*)(void *))(clientnrobase + 0x4990F8);
     int activeWindowType = GetActiveWindowType((void *)CBaseModPanel__m_CFactoryBasePanel);
@@ -308,6 +302,51 @@ DECLARE_MEMBER_HOOK_FUNC(void, CBaseModFooterPanel, OnCommand, void *thisptr, co
     }
 }
 
+//---------------------------------------------------------------------------------
+// Purpose: Hook to automatically update the footer buttons when needed.
+//---------------------------------------------------------------------------------
+/*extern "C" void A64HookFunction(void* const symbol, void* const replace, void** result); // TODO: Using this means we rely on PortalNXSideLoader. Find a way to hook non-vtable funcs...
+Variable nx_footer_show_mouse_buttons("nx_footer_show_mouse_buttons", "0", "Automatically updates the Portal 2 menu buttons at the bottom for mouse.", FCVAR_NONE);
+DECLARE_MEMBER_HOOK_FUNC(void, CBaseModFooterPanel, FixLayout, void *thisptr)
+{
+    static uint8_t orig_bytes[4] = { 0 };
+    static bool bPatched = false;
+
+    extern void CBaseModFooterPanel__FixLayout_Restored(bool bHideAllButtons);
+
+    if (nx_footer_show_mouse_buttons.GetBool())
+    {
+        if (!bPatched)
+        {
+            bPatched = true;
+
+            if (!orig_bytes[0])
+            {
+                memcpy(orig_bytes, (void *)(clientnrobase + Offsets::CBaseModFooterPanel__DrawButtonAndText_stub), sizeof(orig_bytes));
+            }
+
+            uint8_t patch[4] = { 0xE3, 0x00, 0x00, 0x14 }; // Jump to end of function (stub it out)
+            memcpy((void *)(clientnrobase + Offsets::CBaseModFooterPanel__DrawButtonAndText_stub), patch, sizeof(patch));
+        }
+
+        CBaseModFooterPanel__FixLayout_Restored(false);
+    }
+    else
+    {
+        if (bPatched)
+        {
+            bPatched = false;
+            memcpy((void *)(clientnrobase + Offsets::CBaseModFooterPanel__DrawButtonAndText_stub), orig_bytes, sizeof(orig_bytes));
+
+            CBaseModFooterPanel__FixLayout_Restored(true); // Do this once instead of the original so we can clean up
+        }
+        else
+        {
+            CBaseModFooterPanel__FixLayout_Original(thisptr);
+        }
+    }
+}*/
+
 //-----------------------------------------------------------------------------------------
 
 #define VTABLE_FUNC_ADDRESS(nrobase, offset, index) &((void**)(nrobase + offset))[index]
@@ -352,6 +391,9 @@ void ToggleVTableDetours( bool bPatching )
 
         // Restore the menu footer button functionality.
         ToggleDetour(VTABLE_FUNC_ADDRESS(clientnrobase, 0x1353048, 97), CBaseModFooterPanel__OnCommand_Original, CBaseModFooterPanel__OnCommand_Hook, bPatching);
+
+        // Hook to automatically update the footer buttons when needed.
+        // A64HookFunction((void**)(clientnrobase + 0x4DBC64), reinterpret_cast<void*>(CBaseModFooterPanel__FixLayout_Hook), (void**)&CBaseModFooterPanel__FixLayout_Original);
     }
 
     //-----------------------------------------------------------------------------------------
