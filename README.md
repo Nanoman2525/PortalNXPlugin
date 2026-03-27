@@ -30,6 +30,7 @@ Note that all commands are **off** by default when the plugin is loaded.
 |nx_toggle_autojump|cmd|Toggles the autojump ability for all players.|Both|
 |nx_toggle_coop_loading_dots|cmd|Shows the coop loading progress on map transitions.|Portal 2|
 |nx_toggle_floor_reportals|cmd|Toggles the floor reportal ability for all players.|Portal 2|
+|nx_toggle_loading_orange_dots|cmd|Fixes the orange dots not showing when fully loaded into maps.|Portal 2|
 |nx_toggle_menu_controller_button_visibility|cmd|Toggles the visibility of the menu game console helpers on screen.|Portal 2|
 |nx_update_footer_buttons|cmd|Run init logic missing from the game if needed and update the menu footer.|Portal 2|
 

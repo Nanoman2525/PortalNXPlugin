@@ -55,6 +55,7 @@ DECLARE_OFFSET(Panel__GetVParent, 312, 320);
 // client.nro
 DECLARE_OFFSET(CBaseModFooterPanel__DrawButtonAndText_stub, EMPTY_OFFSET, 0x4DC438);
 DECLARE_OFFSET(LoadingProgress__SetupControlStates_dot_patch, EMPTY_OFFSET, 0x5155D4);
+DECLARE_OFFSET(LoadingProgress__DrawLoadingBar_dot_patch, EMPTY_OFFSET, 0x515B04);
 
 // engine.nro
 DECLARE_OFFSET(Plat_FloatTime, 0x3ABAE0, 0x4C16F0);

@@ -104,6 +104,41 @@ CON_COMMAND(nx_toggle_coop_loading_dots, "Shows the coop loading progress on map
     }
 }
 
+CON_COMMAND(nx_toggle_loading_orange_dots, "Fixes the orange dots not showing when fully loaded into maps.")
+{
+    if (!g_Plugin.IsGamePortal2())
+    {
+        Msg("nx_toggle_loading_orange_dots - Works only on Portal 2 game binaries.\n");
+        return;
+    }
+
+    static uint8_t orig_bytes[8] = { 0 };
+    static bool bPatched = false;
+
+    if (!bPatched)
+    {
+        bPatched = true;
+
+        if (!orig_bytes[0])
+        {
+            memcpy(orig_bytes, (void *)(clientnrobase + Offsets::LoadingProgress__DrawLoadingBar_dot_patch), sizeof(orig_bytes));
+        }
+
+        uint8_t patch[8] = { 0x68, 0x66, 0x86, 0x52, 0x68, 0xEE, 0xA7, 0x72 }; // Make the last loading cycle change all dots (Change from 0.97 -> 0.95)
+        memcpy((void *)(clientnrobase + Offsets::LoadingProgress__DrawLoadingBar_dot_patch), patch, sizeof(patch));
+
+        Msg("nx_toggle_loading_orange_dots - Patched.\n");
+    }
+    else
+    {
+        bPatched = false;
+
+        memcpy((void *)(clientnrobase + Offsets::LoadingProgress__DrawLoadingBar_dot_patch), orig_bytes, sizeof(orig_bytes));
+
+        Msg("nx_toggle_loading_orange_dots - Unpatched.\n");
+    }
+}
+
 extern void *engineClient;
 void CBaseModFooterPanel__FixLayout_Restored(bool bHideAllButtons)
 {
