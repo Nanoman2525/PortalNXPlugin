@@ -42,11 +42,10 @@ Note that all commands are **off** by default when the plugin is loaded.
 > It's highly recommended to use [NXSideLoader](https://github.com/masagrator/PortalNXSideLoader), as the build steps are optimized for it. If you're not using this, you will need to mimic the paths and manually repackage `game.zip` after each compilation.
 
 1. Install [devkitPro](https://devkitpro.org/wiki/Getting_Started) for the current platform. (Required for Switch dev)
-2. Have [nxtool](https://github.com/dazjo/nxtool) compiled and ready to use. (Gets the plugin hash after building)
-3. Place the target game's original `romfs/.nrr/launcher_main.nrr` file in `switch/(game_name)/launcher_main.nrr`.
+2. Place the target game's original `romfs/.nrr/launcher_main.nrr` file in `switch/(game_name)/launcher_main.nrr`.
    - A modified version can be used to support multiple plugins.
-4. Configure the parameters at the top in `build.sh`.
-5. Run `build.sh`.
+3. Configure the parameters at the top in `build.sh`.
+4. Run `build.sh`.
    - Creates the plugin `.nro` at the root.
    - Creates the modified `launcher_main.nrr` files for both games.
    - Automatically moves these to the correct locations.

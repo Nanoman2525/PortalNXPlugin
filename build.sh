@@ -9,9 +9,6 @@ PLUGIN_NAME="nx_plugin"
 # Set your path to the Ryujinx main folder
 RYUJINX_PATH=""
 
-# Set your path to the nxtool executable
-NXTOOL_PATH=""
-
 #-----------------------------------------------------------------
 
 # Make it available to Makefile
@@ -48,7 +45,8 @@ patch_and_copy()
     # Update the hex string
     FILE_HEX="${FILE_HEX:0:$((offset * 2))}$new_byte${FILE_HEX:$(((offset + 1) * 2))}"
 
-    EXTRA_HASH=$("${NXTOOL_PATH}" "${PLUGIN_NAME}.nro" | grep Hash | tr -s ' ' | cut -d ' ' -f 2)
+    EXTRA_HASH=$(sha256sum "${PLUGIN_NAME}.nro" | cut -d ' ' -f 1)
+    echo "SHA-256 hash: ${EXTRA_HASH}"
 
     # Find the first non-zero byte from the end
     len=${#FILE_HEX}
