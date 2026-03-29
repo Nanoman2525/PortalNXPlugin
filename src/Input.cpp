@@ -1,172 +1,52 @@
+#include "SDK/Input.hpp"
 #include "NXModule.hpp"
 #include "Offsets.hpp"
 #include "Plugin.hpp"
-#include <string.h> // memset
-
+#include "Command.hpp"
 #include "Variable.hpp"
-
-extern "C" void Msg( const char* pMsg, ... );
+#include <string.h> // memset
 
 Variable nx_enable_keyboard_support("nx_enable_keyboard_support", "0", "On Switch, enables keyboard input reading.", FCVAR_NONE);
 Variable nx_enable_mouse_support("nx_enable_mouse_support", "0", "On Switch, enables mouse input reading.", FCVAR_NONE);
 Variable nx_enable_touchscreen_support("nx_enable_touchscreen_support", "0", "On Switch, enables touchscreen input reading.", FCVAR_NONE);
 
-struct InputEvent_t
+// This is what makes the game's native input system receive a new input
+void PostUserEvent(int m_nType, int m_nData = 0, int m_nData2 = 0, int m_nData3 = 0, int m_nTick = 0)
 {
-	int m_nType;				// Type of the event (see InputEventType_t)
-	int m_nTick;				// Tick on which the event occurred
-	int m_nData;				// Generic 32-bit data, what it contains depends on the event
-	int m_nData2;				// Generic 32-bit data, what it contains depends on the event
-	int m_nData3;				// Generic 32-bit data, what it contains depends on the event
-};
+    InputEvent_t event;
+    memset(&event, 0, sizeof(event));
 
-extern void *g_pInputSystem;
-extern void *g_pLauncherMgr;
-extern void *engineClient;
+    event.m_nType = m_nType;
 
-const int IE_ButtonPressed = 0;
-const int IE_ButtonReleased = 1;
-const int IE_ButtonDoubleClicked = 2;
-const int IE_AnalogValueChanged = 3;
+    if (m_nData)
+    {
+        event.m_nData = m_nData;
+    }
+    if (m_nData2)
+    {
+        event.m_nData2 = m_nData2;
+    }
+    if (m_nData3)
+    {
+        event.m_nData3 = m_nData3;
+    }
 
-// Note: These aren't in the enum like in Portal 2. Instead they are offset from IE_FirstVguiEvent
-int IE_LocateMouseClick = 1001;
-int IE_KeyTyped = 1003;
-int IE_KeyCodeTyped = 1004;
+    if (m_nTick)
+    {
+        event.m_nTick = m_nTick;
+    }
+    else
+    {
+        auto CInputSystem__GetPollTick = (*(int (**)(void *))(*(uintptr_t *)g_pInputSystem + Offsets::CInputSystem__GetPollTick));
+        event.m_nTick = CInputSystem__GetPollTick(g_pInputSystem);
+    }
 
-enum ButtonCode_t
-{
-	BUTTON_CODE_INVALID = -1,
-	BUTTON_CODE_NONE = 0,
+    // Post the event
+    auto CInputSystem__PostUserEvent = *reinterpret_cast<void (**)(void *, const InputEvent_t &)>(*reinterpret_cast<uintptr_t *>(g_pInputSystem) + Offsets::CInputSystem__PostUserEvent);
+    CInputSystem__PostUserEvent(g_pInputSystem, event);
+}
 
-	KEY_FIRST = 0,
-
-	KEY_NONE = KEY_FIRST,
-	KEY_0,
-	KEY_1,
-	KEY_2,
-	KEY_3,
-	KEY_4,
-	KEY_5,
-	KEY_6,
-	KEY_7,
-	KEY_8,
-	KEY_9,
-	KEY_A,
-	KEY_B,
-	KEY_C,
-	KEY_D,
-	KEY_E,
-	KEY_F,
-	KEY_G,
-	KEY_H,
-	KEY_I,
-	KEY_J,
-	KEY_K,
-	KEY_L,
-	KEY_M,
-	KEY_N,
-	KEY_O,
-	KEY_P,
-	KEY_Q,
-	KEY_R,
-	KEY_S,
-	KEY_T,
-	KEY_U,
-	KEY_V,
-	KEY_W,
-	KEY_X,
-	KEY_Y,
-	KEY_Z,
-	KEY_PAD_0,
-	KEY_PAD_1,
-	KEY_PAD_2,
-	KEY_PAD_3,
-	KEY_PAD_4,
-	KEY_PAD_5,
-	KEY_PAD_6,
-	KEY_PAD_7,
-	KEY_PAD_8,
-	KEY_PAD_9,
-	KEY_PAD_DIVIDE,
-	KEY_PAD_MULTIPLY,
-	KEY_PAD_MINUS,
-	KEY_PAD_PLUS,
-	KEY_PAD_ENTER,
-	KEY_PAD_DECIMAL,
-	KEY_LBRACKET,
-	KEY_RBRACKET,
-	KEY_SEMICOLON,
-	KEY_APOSTROPHE,
-	KEY_BACKQUOTE,
-	KEY_COMMA,
-	KEY_PERIOD,
-	KEY_SLASH,
-	KEY_BACKSLASH,
-	KEY_MINUS,
-	KEY_EQUAL,
-	KEY_ENTER,
-	KEY_SPACE,
-	KEY_BACKSPACE,
-	KEY_TAB,
-	KEY_CAPSLOCK,
-	KEY_NUMLOCK,
-	KEY_ESCAPE,
-	KEY_SCROLLLOCK,
-	KEY_INSERT,
-	KEY_DELETE,
-	KEY_HOME,
-	KEY_END,
-	KEY_PAGEUP,
-	KEY_PAGEDOWN,
-	KEY_BREAK,
-	KEY_LSHIFT,
-	KEY_RSHIFT,
-	KEY_LALT,
-	KEY_RALT,
-	KEY_LCONTROL,
-	KEY_RCONTROL,
-	KEY_LWIN,
-	KEY_RWIN,
-	KEY_APP,
-	KEY_UP,
-	KEY_LEFT,
-	KEY_DOWN,
-	KEY_RIGHT,
-	KEY_F1,
-	KEY_F2,
-	KEY_F3,
-	KEY_F4,
-	KEY_F5,
-	KEY_F6,
-	KEY_F7,
-	KEY_F8,
-	KEY_F9,
-	KEY_F10,
-	KEY_F11,
-	KEY_F12,
-	KEY_CAPSLOCKTOGGLE,
-	KEY_NUMLOCKTOGGLE,
-	KEY_SCROLLLOCKTOGGLE,
-
-	KEY_LAST = KEY_SCROLLLOCKTOGGLE,
-	KEY_COUNT = KEY_LAST - KEY_FIRST + 1,
-
-	// Mouse
-	MOUSE_FIRST = KEY_LAST + 1,
-
-	MOUSE_LEFT = MOUSE_FIRST,
-	MOUSE_RIGHT,
-	MOUSE_MIDDLE,
-	MOUSE_4,
-	MOUSE_5,
-	MOUSE_WHEEL_UP,		// A fake button which is 'pressed' and 'released' when the wheel is moved up 
-	MOUSE_WHEEL_DOWN,	// A fake button which is 'pressed' and 'released' when the wheel is moved down
-
-	MOUSE_LAST = MOUSE_WHEEL_DOWN,
-	MOUSE_COUNT = MOUSE_LAST - MOUSE_FIRST + 1
-};
-
+#pragma region KEYBOARD_INPUT
 // Convert ButtonCode_t enum value to HID bit position
 uint8_t ButtonCodeToBitPosition(ButtonCode_t buttonCode)
 {
@@ -410,41 +290,6 @@ ButtonCode_t BitPositionToButtonCode(uint8_t bitPosition)
     return BUTTON_CODE_INVALID;
 }
 
-void PostUserEvent(int m_nType, int m_nData = 0, int m_nData2 = 0, int m_nData3 = 0, int m_nTick = 0)
-{
-    InputEvent_t event;
-    memset(&event, 0, sizeof(event));
-
-    event.m_nType = m_nType;
-
-    if (m_nData)
-    {
-        event.m_nData = m_nData;
-    }
-    if (m_nData2)
-    {
-        event.m_nData2 = m_nData2;
-    }
-    if (m_nData3)
-    {
-        event.m_nData3 = m_nData3;
-    }
-
-    if (m_nTick)
-    {
-        event.m_nTick = m_nTick;
-    }
-    else
-    {
-        auto CInputSystem__GetPollTick = (*(int (**)(void *))(*(uintptr_t *)g_pInputSystem + Offsets::CInputSystem__GetPollTick));
-        event.m_nTick = CInputSystem__GetPollTick(g_pInputSystem);
-    }
-
-    // Post the event
-    auto CInputSystem__PostUserEvent = *reinterpret_cast<void (**)(void *, const InputEvent_t &)>(*reinterpret_cast<uintptr_t *>(g_pInputSystem) + Offsets::CInputSystem__PostUserEvent);
-    CInputSystem__PostUserEvent(g_pInputSystem, event);
-}
-
 bool IsKeyBitSet(const nn::hid::KeyboardState& kbState, uint8_t bitPosition)
 {
     int arrayIndex = bitPosition / 64;          // Calculate which 64-bit block the bit is in
@@ -453,17 +298,6 @@ bool IsKeyBitSet(const nn::hid::KeyboardState& kbState, uint8_t bitPosition)
 
     // Check if the bit is set in the appropriate array element
     return (kbState.keys[arrayIndex] & keyBitmask) != 0;
-}
-
-bool IsKeyNewlyPressed(const nn::hid::KeyboardState& kbState, const nn::hid::KeyboardState& prevKBKeys, uint8_t bitPosition)
-{
-    int arrayIndex = bitPosition / 64;          // Calculate which 64-bit block the bit is in
-    int bitInArray = bitPosition % 64;          // Calculate the bit position within that block
-    uint64_t keyBitmask = 1ULL << bitInArray;   // Create the bit mask for that position
-
-    // Check if the bit is set in current state but not in previous state
-    return ((kbState.keys[arrayIndex] & keyBitmask) != 0) &&
-           ((prevKBKeys.keys[arrayIndex] & keyBitmask) == 0);
 }
 
 void ProcessKeyboardState(const nn::hid::KeyboardState& kbState, nn::hid::KeyboardState& prevKBKeys)
@@ -632,6 +466,7 @@ void ProcessKeyboardTypingInput(const nn::hid::KeyboardState& kbState, uint64_t&
     // Update previous state
     prevKBTypingInput = kbState.keys[0];
 }
+#pragma endregion
 
 #pragma region MOUSE_INPUT
 class CCocoaEvent
@@ -778,6 +613,7 @@ void ProcessMouseState(const nn::hid::MouseState& mouseState)
 }
 #pragma endregion
 
+#pragma region SWKBD_INPUT
 // Support for software keyboard input
 void GetSWKBInput(char* buf, size_t size, const char *pszHeaderText, const char *pszGuideText)
 {
@@ -824,6 +660,7 @@ void GetSWKBInput(char* buf, size_t size, const char *pszHeaderText, const char 
     }
     buf[out] = '\0';
 }
+#pragma endregion
 
 static bool s_bGatheringSWKBInput = false;
 static char s_SWKBBuf[512];
@@ -909,27 +746,19 @@ void InitNXInput(bool bIsPortal2Build)
         IE_KeyTyped = 202;
         IE_KeyCodeTyped = 203;
     }
+    else
+    {
+        IE_LocateMouseClick = 1001;
+        IE_KeyTyped = 1003;
+        IE_KeyCodeTyped = 1004;
+    }
 }
 
 void ShutdownNXInput(bool bIsPortal2Build)
 {
 }
 
-// Add a copy of Saul's cvar unhiding functionality
-#include "Command.hpp"
-extern void *g_pCVar;
-CON_COMMAND(nx_cvar_unhide_all, "Unhide all FCVAR_HIDDEN and FCVAR_DEVELOPMENTONLY convars")
-{
-	// Unhide dev cvars
-    FOR_ALL_CONSOLE_COMMANDS( pCommand )
-    {
-        if ( pCommand->IsFlagSet( FCVAR_DEVELOPMENTONLY ) || pCommand->IsFlagSet( FCVAR_HIDDEN ) )
-        {
-            pCommand->RemoveFlags( FCVAR_DEVELOPMENTONLY | FCVAR_HIDDEN );
-        }
-    }
-}
-
+// Keeping so that a controller button can do this...
 CON_COMMAND(nx_open_on_screen_keyboard, "Execute commands via the on-screen keyboard.")
 {
     if (s_bGatheringSWKBInput)

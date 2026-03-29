@@ -7,9 +7,6 @@
 extern Variable nx_enable_mouse_support;
 extern void ScaleMouse(nn::hid::MouseState &mouseState);
 
-extern void *g_GameMovement;
-extern void *g_pLauncherMgr;
-
 // Simple defines to make it easier to create a hook a function.
 #define DECLARE_HOOK_FUNC( returnType, FuncName, ... ) \
 static returnType(*FuncName##_Original)(__VA_ARGS__) = nullptr; \
@@ -166,16 +163,18 @@ DECLARE_MEMBER_HOOK_FUNC(void, MenuItem, OnCursorExited, void *thisptr)
 // Purpose: Hook to fix console printing in Portal.
 // TODO:    Re-add the implementation for color and dev-only printing support.
 //---------------------------------------------------------------------------------
+Variable nx_enable_printing_in_console("nx_enable_printing_in_console", "0", "Fixes text output in the console not appearing by default.");
 DECLARE_HOOK_FUNC(int, vsnprintf, char *s, size_t maxlen, const char *format, __gnuc_va_list arg)
 {
-    int iOriginal = vsnprintf_Original(s, maxlen, format, arg);
+    if (nx_enable_printing_in_console.GetBool())
+    {
+        // Actually make the info print to the console
+        uintptr_t *thisptr = reinterpret_cast<uintptr_t **>(*reinterpret_cast<uintptr_t **>(GameUInrobase + Offsets::CConsolePanel__globalptr))[Offsets::CConsolePanel__ptr_index];
+        auto CConsolePanel__Print = reinterpret_cast<void (*)(uintptr_t *, const char *)>(reinterpret_cast<void **>(*thisptr)[Offsets::CConsolePanel__Print_vtable_index]);
+        CConsolePanel__Print(thisptr, s);
+    }
 
-    // Actually make the info print to the console
-    uintptr_t *thisptr = reinterpret_cast<uintptr_t **>(*reinterpret_cast<uintptr_t **>(GameUInrobase + Offsets::CConsolePanel__globalptr))[Offsets::CConsolePanel__ptr_index];
-    auto CConsolePanel__Print = reinterpret_cast<void (*)(uintptr_t *, const char *)>(reinterpret_cast<void **>(*thisptr)[Offsets::CConsolePanel__Print_vtable_index]);
-    CConsolePanel__Print(thisptr, s);
-
-    return iOriginal;
+    return vsnprintf_Original(s, maxlen, format, arg);
 }
 
 //---------------------------------------------------------------------------------
@@ -190,7 +189,6 @@ DECLARE_MEMBER_HOOK_FUNC(bool, CPortalGameMovement, GameHasLadders)
 //---------------------------------------------------------------------------------
 // Purpose: Allow us to control the max player limit when starting a server.
 //---------------------------------------------------------------------------------
-extern "C" void Warning( const char* pMsg, ... );
 Variable nx_max_players_override("nx_max_players_override", "0", "1-33: Max player count when starting a MP server. Otherwise: Game decides.");
 DECLARE_MEMBER_HOOK_FUNC(void, CGameServer, SetMaxClients, void *thisptr, int number)
 {
@@ -207,7 +205,7 @@ DECLARE_MEMBER_HOOK_FUNC(void, CGameServer, SetMaxClients, void *thisptr, int nu
 		}
 		else
 		{
-			Warning( "nx_max_players_override - Refusing max player override, due to a singleplayer gamemode load!\n" );
+			Msg( "nx_max_players_override - Refusing max player override, due to a singleplayer gamemode load!\n" );
 		}
 	}
 
@@ -393,7 +391,14 @@ void ToggleVTableDetours( bool bPatching )
         ToggleDetour(VTABLE_FUNC_ADDRESS(clientnrobase, 0x1353048, 97), CBaseModFooterPanel__OnCommand_Original, CBaseModFooterPanel__OnCommand_Hook, bPatching);
 
         // Hook to automatically update the footer buttons when needed.
-        // A64HookFunction((void**)(clientnrobase + 0x4DBC64), reinterpret_cast<void*>(CBaseModFooterPanel__FixLayout_Hook), (void**)&CBaseModFooterPanel__FixLayout_Original);
+        /*if (bPatching)
+        {
+            A64HookFunction((void**)(clientnrobase + 0x4DBC64), reinterpret_cast<void*>(CBaseModFooterPanel__FixLayout_Hook), (void**)&CBaseModFooterPanel__FixLayout_Original);
+        }
+        else
+        {
+
+        }*/
     }
 
     //-----------------------------------------------------------------------------------------

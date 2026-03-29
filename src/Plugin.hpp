@@ -49,4 +49,12 @@ private:
 
 extern CPlugin g_Plugin;
 
+extern void *g_pCVar;
+extern void *g_pInputSystem;
+extern void *g_pLauncherMgr;
+extern void *g_GameMovement;
+extern void *engineClient;
+
+extern "C" void Msg( const char* pMsg, ... );
+
 #endif // PLUGIN_HPP

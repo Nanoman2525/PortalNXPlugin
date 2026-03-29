@@ -3,37 +3,68 @@
 #include "Offsets.hpp"
 #include "Plugin.hpp"
 
-extern "C" void Msg( const char* pMsg, ... );
-
-CON_COMMAND(nx_toggle_autojump, "Toggles the autojump ability for all players.")
+// Probably should refine this at some point, but it will work for now.
+struct TogglePatch
 {
-    static uint8_t orig_bytes[4] = { 0 };
-    static bool bPatched = false;
+    uintptr_t *base;            // Module offsets are not loaded at runtime, so defer to ptr.
+    int *offset;                // Game offsets are not loaded at runtime, so defer to ptr.
+    uint8_t patch_bytes[16];
+    size_t patch_size;
+    uint8_t orig_bytes[16];     // Adjust max size here if we need to.
+    bool bPatched = false;
+    bool bOrigSaved = false;
 
-    if (!bPatched)
+    template<size_t N>
+    TogglePatch(uintptr_t *base, int *offset, const uint8_t (&bytes)[N])
+        : base(base), offset(offset), patch_size(N)
     {
-        bPatched = true;
+        memcpy(patch_bytes, bytes, N);
+    }
 
-        if (!orig_bytes[0])
+    void Apply()
+    {
+        if (!bOrigSaved)
         {
-            memcpy(orig_bytes, (void *)(servernrobase + Offsets::CPortalGameMovement__CheckJumpButton_autojump), sizeof(orig_bytes));
+            memcpy(orig_bytes, (void *)(*base + *offset), patch_size);
+            bOrigSaved = true;
         }
 
-        uint8_t patch[4] = { 0x1F, 0x20, 0x03, 0xD5 }; // Nop
-        memcpy((void *)(servernrobase + Offsets::CPortalGameMovement__CheckJumpButton_autojump), patch, sizeof(patch));
-
-        Msg("nx_toggle_autojump - Patched.\n");
+        memcpy((void *)(*base + *offset), patch_bytes, patch_size);
+        bPatched = true;
     }
-    else
+
+    void Restore()
     {
+        if (bOrigSaved)
+        {
+            memcpy((void *)(*base + *offset), orig_bytes, patch_size);
+        }
         bPatched = false;
-
-        memcpy((void *)(servernrobase + Offsets::CPortalGameMovement__CheckJumpButton_autojump), orig_bytes, sizeof(orig_bytes));
-
-        Msg("nx_toggle_autojump - Unpatched.\n");
     }
+
+    void Toggle()
+    {
+        if (!bPatched)
+        {
+            Apply();
+        }
+        else
+        {
+            Restore();
+        }
+    }
+};
+
+// Autojump
+static TogglePatch nx_autojump = { &servernrobase, &Offsets::CPortalGameMovement__CheckJumpButton_autojump, { 0x1F, 0x20, 0x03, 0xD5 } };
+CON_COMMAND(nx_toggle_autojump, "Toggles the autojump ability for all players.")
+{
+    nx_autojump.Toggle();
+    Msg("nx_toggle_autojump - %s.\n", nx_autojump.bPatched ? "Patched" : "Unpatched");
 }
 
+// Floor reportals
+static TogglePatch nx_floor_reportals = { &servernrobase, &Offsets::CPortal_Base2D__NewLocation_reportal, { 0x1F, 0x20, 0x03, 0xD5 } };
 CON_COMMAND(nx_toggle_floor_reportals, "Toggles the floor reportal ability for all players.")
 {
     if (!g_Plugin.IsGamePortal2())
@@ -42,33 +73,12 @@ CON_COMMAND(nx_toggle_floor_reportals, "Toggles the floor reportal ability for a
         return;
     }
 
-    static uint8_t orig_bytes[4] = { 0 };
-    static bool bPatched = false;
-
-    if (!bPatched)
-    {
-        bPatched = true;
-
-        if (!orig_bytes[0])
-        {
-            memcpy(orig_bytes, (void *)(servernrobase + Offsets::CPortal_Base2D__NewLocation_reportal), sizeof(orig_bytes));
-        }
-
-        uint8_t patch[4] = { 0x1F, 0x20, 0x03, 0xD5 }; // Nop
-        memcpy((void *)(servernrobase + Offsets::CPortal_Base2D__NewLocation_reportal), patch, sizeof(patch));
-
-        Msg("nx_toggle_floor_reportals - Patched.\n");
-    }
-    else
-    {
-        bPatched = false;
-
-        memcpy((void *)(servernrobase + Offsets::CPortal_Base2D__NewLocation_reportal), orig_bytes, sizeof(orig_bytes));
-
-        Msg("nx_toggle_floor_reportals - Unpatched.\n");
-    }
+    nx_floor_reportals.Toggle();
+    Msg("nx_toggle_floor_reportals - %s.\n", nx_floor_reportals.bPatched ? "Patched" : "Unpatched");
 }
 
+// Coop loading dots
+static TogglePatch nx_coop_loading_dots = { &clientnrobase, &Offsets::LoadingProgress__SetupControlStates_dot_patch, { 0x7F, 0xE2, 0x36, 0x39 } };
 CON_COMMAND(nx_toggle_coop_loading_dots, "Shows the coop loading progress on map transitions.")
 {
     if (!g_Plugin.IsGamePortal2())
@@ -77,33 +87,12 @@ CON_COMMAND(nx_toggle_coop_loading_dots, "Shows the coop loading progress on map
         return;
     }
 
-    static uint8_t orig_bytes[4] = { 0 };
-    static bool bPatched = false;
-
-    if (!bPatched)
-    {
-        bPatched = true;
-
-        if (!orig_bytes[0])
-        {
-            memcpy(orig_bytes, (void *)(clientnrobase + Offsets::LoadingProgress__SetupControlStates_dot_patch), sizeof(orig_bytes));
-        }
-
-        uint8_t patch[4] = { 0x7F, 0xE2, 0x36, 0x39 };
-        memcpy((void *)(clientnrobase + Offsets::LoadingProgress__SetupControlStates_dot_patch), patch, sizeof(patch));
-
-        Msg("nx_toggle_coop_loading_dots - Patched.\n");
-    }
-    else
-    {
-        bPatched = false;
-
-        memcpy((void *)(clientnrobase + Offsets::LoadingProgress__SetupControlStates_dot_patch), orig_bytes, sizeof(orig_bytes));
-
-        Msg("nx_toggle_coop_loading_dots - Unpatched.\n");
-    }
+    nx_coop_loading_dots.Toggle();
+    Msg("nx_toggle_coop_loading_dots - %s.\n", nx_coop_loading_dots.bPatched ? "Patched" : "Unpatched");
 }
 
+// Loading orange dots
+static TogglePatch nx_loading_orange_dots = { &clientnrobase, &Offsets::LoadingProgress__DrawLoadingBar_dot_patch, { 0x68, 0x66, 0x86, 0x52, 0x68, 0xEE, 0xA7, 0x72 } };
 CON_COMMAND(nx_toggle_loading_orange_dots, "Fixes the orange dots not showing when fully loaded into maps.")
 {
     if (!g_Plugin.IsGamePortal2())
@@ -112,34 +101,26 @@ CON_COMMAND(nx_toggle_loading_orange_dots, "Fixes the orange dots not showing wh
         return;
     }
 
-    static uint8_t orig_bytes[8] = { 0 };
-    static bool bPatched = false;
-
-    if (!bPatched)
-    {
-        bPatched = true;
-
-        if (!orig_bytes[0])
-        {
-            memcpy(orig_bytes, (void *)(clientnrobase + Offsets::LoadingProgress__DrawLoadingBar_dot_patch), sizeof(orig_bytes));
-        }
-
-        uint8_t patch[8] = { 0x68, 0x66, 0x86, 0x52, 0x68, 0xEE, 0xA7, 0x72 }; // Make the last loading cycle change all dots (Change from 0.97 -> 0.95)
-        memcpy((void *)(clientnrobase + Offsets::LoadingProgress__DrawLoadingBar_dot_patch), patch, sizeof(patch));
-
-        Msg("nx_toggle_loading_orange_dots - Patched.\n");
-    }
-    else
-    {
-        bPatched = false;
-
-        memcpy((void *)(clientnrobase + Offsets::LoadingProgress__DrawLoadingBar_dot_patch), orig_bytes, sizeof(orig_bytes));
-
-        Msg("nx_toggle_loading_orange_dots - Unpatched.\n");
-    }
+    nx_loading_orange_dots.Toggle();
+    Msg("nx_toggle_loading_orange_dots - %s.\n", nx_loading_orange_dots.bPatched ? "Patched" : "Unpatched");
 }
 
-extern void *engineClient;
+// Force max FPS
+static TogglePatch nx_force_max_fps = { &enginenrobase, &Offsets::ApplySplitscreenPerformanceConfig__fps_patch, { 0x00, 0x00, 0x80, 0x52, 0x1F, 0x20, 0x03, 0xD5 } };
+CON_COMMAND(nx_toggle_force_max_fps, "Forces r_dynres_enable and nvn_swap_interval to 1. (Won't be 30 FPS in splitscreen)")
+{
+    if (!g_Plugin.IsGamePortal2())
+    {
+        Msg("nx_toggle_force_max_fps - Works only on Portal 2 game binaries.\n");
+        return;
+    }
+
+    // This checks against "engine->IsSplitScreenActive()" to see if we should run at 30 fps, otherwise, run at 60.
+    // It may be a good idea to hook this up to ConVar fps_max again, but unfortunately as of current, we are limited to 60 fps as the max.
+    nx_force_max_fps.Toggle();
+    Msg("nx_toggle_force_max_fps - %s.\n", nx_force_max_fps.bPatched ? "Patched" : "Unpatched");
+}
+
 void CBaseModFooterPanel__FixLayout_Restored(bool bHideAllButtons)
 {
     uintptr_t CBaseModPanel__m_CFactoryBasePanel = *(uintptr_t *)(clientnrobase + 0x1614958); // CBaseModPanel* type
@@ -332,6 +313,7 @@ void CBaseModFooterPanel__FixLayout_Restored(bool bHideAllButtons)
     }
 }
 
+// Footer buttons aren't compiled out, but they have been severely stripped.
 CON_COMMAND(nx_update_footer_buttons, "Run init logic missing from the game if needed and update the menu footer.")
 {
     if (!g_Plugin.IsGamePortal2())
@@ -341,4 +323,17 @@ CON_COMMAND(nx_update_footer_buttons, "Run init logic missing from the game if n
     }
 
     CBaseModFooterPanel__FixLayout_Restored(false);
+}
+
+// Add cvar unhiding functionality like in Saul's plugin
+// https://github.com/saul/cvar-unhide/blob/master/serverplugin.cpp#L192-L209
+CON_COMMAND(nx_cvar_unhide_all, "Unhide all FCVAR_HIDDEN and FCVAR_DEVELOPMENTONLY convars")
+{
+    FOR_ALL_CONSOLE_COMMANDS( pCommand )
+    {
+        if ( pCommand->IsFlagSet( FCVAR_DEVELOPMENTONLY ) || pCommand->IsFlagSet( FCVAR_HIDDEN ) )
+        {
+            pCommand->RemoveFlags( FCVAR_DEVELOPMENTONLY | FCVAR_HIDDEN );
+        }
+    }
 }

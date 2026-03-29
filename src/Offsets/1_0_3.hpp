@@ -65,6 +65,7 @@ DECLARE_OFFSET(CEngineClient__GetMouseDelta_vtable_index, 126, 160);
 DECLARE_OFFSET(CGameServer__vtable, EMPTY_OFFSET, 0x996238);
 DECLARE_OFFSET(CGameServer__SetMaxClients_vtable_index, EMPTY_OFFSET, 39);
 DECLARE_OFFSET(CGameServer__m_nMaxClientsLimit_static_offset, EMPTY_OFFSET, 0xDE51D0 + 4);
+DECLARE_OFFSET(ApplySplitscreenPerformanceConfig__fps_patch, EMPTY_OFFSET, 0x2C62F4); // Note: Switch-exclusive function. This is a custom func name.
 
 // inputsystem.nro
 DECLARE_OFFSET(CInputSystem__GetPollTick, 80, 104);

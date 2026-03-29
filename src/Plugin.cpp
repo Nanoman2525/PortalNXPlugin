@@ -71,8 +71,13 @@ bool CPlugin::Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn gameSer
 	Command::RegisterAll();
 	Variable::RegisterAll();
 
-	// Remove Portal 2 patches and features if this is the Portal build
-	if (!this->m_bIsGamePortal2)
+	// Remove game-specific patches and features if this is the other game
+	if (this->m_bIsGamePortal2)
+	{
+		extern Variable nx_enable_printing_in_console;
+		nx_enable_printing_in_console.Unregister();
+	}
+	else
 	{
 		extern Variable nx_enable_ladders;
 		nx_enable_ladders.Unregister();

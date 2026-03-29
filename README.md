@@ -24,12 +24,14 @@ Note that all commands are **off** by default when the plugin is loaded.
 |nx_enable_keyboard_support|0|On Switch, enables keyboard input reading.|Both|
 |nx_enable_ladders|0|Enables ladder usage for all players.|Portal 2|
 |nx_enable_mouse_support|0|On Switch, enables mouse input reading.|Both|
+|nx_enable_printing_in_console|0|Fixes text output in the console not appearing by default.|Portal|
 |nx_enable_touchscreen_support|0|On Switch, enables touchscreen input reading.|Both|
 |nx_max_players_override|0|1-33: Max player count when starting a MP server. Otherwise: Game decides.|Portal 2|
 |nx_open_on_screen_keyboard|cmd|Execute commands via the on-screen keyboard.|Both|
 |nx_toggle_autojump|cmd|Toggles the autojump ability for all players.|Both|
 |nx_toggle_coop_loading_dots|cmd|Shows the coop loading progress on map transitions.|Portal 2|
 |nx_toggle_floor_reportals|cmd|Toggles the floor reportal ability for all players.|Portal 2|
+|nx_toggle_force_max_fps|cmd|Forces r_dynres_enable and nvn_swap_interval to 1. (Won't be 30 FPS in splitscreen)|Portal 2|
 |nx_toggle_loading_orange_dots|cmd|Fixes the orange dots not showing when fully loaded into maps.|Portal 2|
 |nx_toggle_menu_controller_button_visibility|cmd|Toggles the visibility of the menu game console helpers on screen.|Portal 2|
 |nx_update_footer_buttons|cmd|Run init logic missing from the game if needed and update the menu footer.|Portal 2|
