@@ -11,7 +11,7 @@ Allows you to build and load [server plugins](https://developer.valvesoftware.co
    - This is done by checking against a whitelist of **SHA-256** file hashes stored in `romfs/.nrr/launcher_main.nrr`.
 - In order to bypass this, we modify that file by...
    - incrementing the number of whitelisted binaries stored at offset `0x344` by one.
-   - overwriting the start of the `00` byte repitition (that lasts to the end of the file) with the plugin's hash, thereby whitelisting the plugin.
+   - overwriting the start of the `00` byte repetition (that lasts to the end of the file) with the plugin's hash, thereby whitelisting the plugin.
 - Interestingly, both Switch games only load modules only through one directory, `romfs/nro/`, so we pack the plugin here.
 
 # Commands added
@@ -39,7 +39,7 @@ Note that all commands are **off** by default when the plugin is loaded.
 # Building
 
 > [!NOTE]
-> It's highly recommended to use [NXSideLoader](https://github.com/masagrator/PortalNXSideLoader), as the build steps are optimized for it. If you're not using this, you will need to mimic the paths and manually repackage `game.zip` after each compilation.
+> It's highly recommended to use [PortalNXSideLoader](https://github.com/masagrator/PortalNXSideLoader), as the build steps are optimized for it. If you're not using this, you will need to mimic the paths and manually repackage `game.zip` after each compilation.
 
 1. Install [devkitPro](https://devkitpro.org/wiki/Getting_Started) for the current platform. (Required for Switch dev)
 2. Place the target game's original `romfs/.nrr/launcher_main.nrr` file in `switch/(game_name)/launcher_main.nrr`.
@@ -56,7 +56,19 @@ This assumes you have already have a plugin and its associating `launcher_main.n
 
 1. Create an `autoexec.cfg` file and configure it:
    - Include the `plugin_load (plugin_name)` command first.
-   - Include any other commands after that you'd like to run automatically when launching the game.
+   - Include any other [commands](https://developer.valvesoftware.com/wiki/List_of_Portal_2_console_commands_and_variables) after that you'd like to run automatically when launching the game.
+   - Example contents:
+      ```
+      // Load the plugin
+      plugin_load "nx_plugin"
+
+      // Automatically enable some custom features
+      nx_cvar_unhide_all
+      nx_enable_printing_in_console "1"
+      nx_enable_keyboard_support "1"
+      nx_enable_mouse_support "1"
+      nx_enable_touchscreen_support "1"
+      ```
 2. Exclusive to Portal 2, the developers left in `-nomouse` in `romfs/nxcontent/rom_boot_params.txt`
    - If you specifically want the mouse support to work for this game, dump the game's original file and remove that argument.
 3. Finally, make sure that all files are placed in these relative directories to your install:
@@ -64,5 +76,5 @@ This assumes you have already have a plugin and its associating `launcher_main.n
    - launcher_main.nrr: `romfs/.nrr/launcher_main.nrr`
    - autoexec.cfg: `romfs/portal/cfg/autoexec.cfg` for Portal, `romfs/portal2/cfg/autoexec.cfg` for Portal 2.
    - rom_boot_params.txt: `romfs/nxcontent/rom_boot_params.txt`
-4. If you are not using NXSideLoader, repackage your archive with the new files into `game.zip`.
+4. If you are not using [PortalNXSideLoader](https://github.com/masagrator/PortalNXSideLoader), repackage your archive with the new files into `game.zip`.
 5. Run the game.

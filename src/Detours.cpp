@@ -68,6 +68,36 @@ DECLARE_MEMBER_HOOK_FUNC( void, CSDLMgr, PumpWindowsMessageLoop, void *thisptr )
 }
 
 //---------------------------------------------------------------------------------
+// Purpose: Allows us to not reach the borders of the screen when moving the mouse
+//          while in-game (Won't work when using Ryujinx since no locked mouse
+//          capture supported)
+//---------------------------------------------------------------------------------
+DECLARE_MEMBER_HOOK_FUNC( void, CSDLMgr, SetCursorPosition, void *thisptr, int x, int y )
+{
+    /*if (nx_enable_mouse_support.GetBool())
+    {
+        // TODO: Finish this to manually reset the mouse
+        nn::hid::MouseState mouseState;
+        nn::hid::detail::GetMouseState(&mouseState);
+        Msg("BEFORE: x: %d, y: %d\n", mouseState.x, mouseState.y)   ;
+
+        uintptr_t sharedMemBase = *(uintptr_t *)((uintptr_t)&nn::hid::detail::GetMouseState + 11509976); // Portal 2
+
+        for (int i = 0; i < 17; i++)
+        {
+            uintptr_t entryAddr = sharedMemBase + i * 0x30;
+            *(int32_t *)(entryAddr + 0x28 + 8)  = x;
+            *(int32_t *)(entryAddr + 0x28 + 12) = y;
+        }
+
+        nn::hid::detail::GetMouseState(&mouseState);
+        Msg("AFTER: x: %d, y: %d\n", mouseState.x, mouseState.y);
+    }*/
+
+    CSDLMgr__SetCursorPosition_Original(thisptr, x, y);
+}
+
+//---------------------------------------------------------------------------------
 // Purpose: Hook to fix fire double mouse click events.
 // TODO:    This double press code should apply to all mouse buttons, not just MOUSE_LEFT.
 //---------------------------------------------------------------------------------
@@ -160,12 +190,14 @@ DECLARE_MEMBER_HOOK_FUNC(void, MenuItem, OnCursorExited, void *thisptr)
 }
 
 //---------------------------------------------------------------------------------
-// Purpose: Hook to fix console printing in Portal.
-// TODO:    Re-add the implementation for color and dev-only printing support.
+// Purpose: Hook to fix console printing in Portal (No color support yet).
 //---------------------------------------------------------------------------------
 Variable nx_enable_printing_in_console("nx_enable_printing_in_console", "0", "Fixes text output in the console not appearing by default.");
 DECLARE_HOOK_FUNC(int, vsnprintf, char *s, size_t maxlen, const char *format, __gnuc_va_list arg)
 {
+    // Need to call this first to initialize "s"
+    int iOriginal = vsnprintf_Original(s, maxlen, format, arg);
+
     if (nx_enable_printing_in_console.GetBool())
     {
         // Actually make the info print to the console
@@ -174,7 +206,7 @@ DECLARE_HOOK_FUNC(int, vsnprintf, char *s, size_t maxlen, const char *format, __
         CConsolePanel__Print(thisptr, s);
     }
 
-    return vsnprintf_Original(s, maxlen, format, arg);
+    return iOriginal;
 }
 
 //---------------------------------------------------------------------------------
@@ -214,7 +246,7 @@ DECLARE_MEMBER_HOOK_FUNC(void, CGameServer, SetMaxClients, void *thisptr, int nu
 }
 
 //---------------------------------------------------------------------------------
-// Purpose: Restore menu footer button functionality.
+// Purpose: Hook to restore menu footer buttons firing menu events when clicked.
 //---------------------------------------------------------------------------------
 DECLARE_MEMBER_HOOK_FUNC(void, CBaseModFooterPanel, OnCommand, void *thisptr, const char *pCommand)
 {
@@ -354,6 +386,9 @@ void ToggleVTableDetours( bool bPatching )
     // Allow us to hook into the main input system thread
     ToggleDetour(&(*reinterpret_cast<void ***>(g_pLauncherMgr))[Offsets::CSDLMgr__PumpWindowsMessageLoop_vtable_index], CSDLMgr__PumpWindowsMessageLoop_Original, CSDLMgr__PumpWindowsMessageLoop_Hook, bPatching);
 
+    // Allows us to not reach the borders of the screen when moving the mouse while in-game (Won't work when using Ryujinx since no locked mouse capture supported)
+    ToggleDetour(&(*reinterpret_cast<void ***>(g_pLauncherMgr))[Offsets::CSDLMgr__SetCursorPosition_vtable_index], CSDLMgr__SetCursorPosition_Original, CSDLMgr__SetCursorPosition_Hook, bPatching);
+
     // We need this detour to actually fire double mouse click events since they normally don't work for some reason
     ToggleDetour(VTABLE_FUNC_ADDRESS(vgui2nrobase, Offsets::CInputSystem__vtable, Offsets::CInputSystem__InternalMousePressed_vtable_index), CInputSystem__InternalMousePressed_Original, CInputSystem__InternalMousePressed_Hook, bPatching);
 
@@ -387,8 +422,8 @@ void ToggleVTableDetours( bool bPatching )
         // Allow us to control the max player limit when starting a server.
         ToggleDetour(VTABLE_FUNC_ADDRESS(enginenrobase, Offsets::CGameServer__vtable, Offsets::CGameServer__SetMaxClients_vtable_index), CGameServer__SetMaxClients_Original, CGameServer__SetMaxClients_Hook, bPatching);
 
-        // Restore the menu footer button functionality.
-        ToggleDetour(VTABLE_FUNC_ADDRESS(clientnrobase, 0x1353048, 97), CBaseModFooterPanel__OnCommand_Original, CBaseModFooterPanel__OnCommand_Hook, bPatching);
+        // Hook to restore menu footer buttons firing menu events when clicked.
+        ToggleDetour(VTABLE_FUNC_ADDRESS(clientnrobase, Offsets::CBaseModFooterPanel__vtable, Offsets::CBaseModFooterPanel__OnCommand_vtable_index), CBaseModFooterPanel__OnCommand_Original, CBaseModFooterPanel__OnCommand_Hook, bPatching);
 
         // Hook to automatically update the footer buttons when needed.
         /*if (bPatching)
@@ -400,27 +435,4 @@ void ToggleVTableDetours( bool bPatching )
 
         }*/
     }
-
-    //-----------------------------------------------------------------------------------------
-
-    // TODO: Look into CInputStackSystem::SetCursorPosition for the below...
-    // Allows us to not reach the borders of the screen when moving the mouse while in-game (Won't work when using Ryujinx since no locked mouse capture supported)
-
-    // TODO: Finish this to manually reset the mouse
-    /*nn::hid::MouseState mouseState;
-    nn::hid::detail::GetMouseState(&mouseState);
-    Msg("BEFORE: x: %d, y: %d\n", mouseState.x, mouseState.y)   ;
-
-    uintptr_t *sharedMemoryPtr = (uintptr_t *)((uintptr_t)&nn::hid::detail::GetMouseState + 0xAFA0D8); // Portal 2
-    uintptr_t sharedMemoryBase = *sharedMemoryPtr;
-
-    int currentIndex = *(int *)(sharedMemoryBase + 16);
-    int offset = ((currentIndex - 0 + 17) % 17); // Most recent entry
-    uintptr_t mouseStateAddr = sharedMemoryBase + 48 * offset;
-
-    *(int32_t *)(mouseStateAddr + 48) = x; // Set X coordinate
-    *(int32_t *)(mouseStateAddr + 52) = y; // Set Y coordinate
-
-    nn::hid::detail::GetMouseState(&mouseState);
-    Msg("AFTER: x: %d, y: %d\n", mouseState.x, mouseState.y);*/
 }

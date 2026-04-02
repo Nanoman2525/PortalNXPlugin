@@ -53,6 +53,8 @@ DECLARE_OFFSET(Menu__OnCursorExitedMenuItem, 0xE8EA8, 0x715BA0);
 DECLARE_OFFSET(Panel__GetVParent, 312, 320);
 
 // client.nro
+DECLARE_OFFSET(CBaseModFooterPanel__vtable, EMPTY_OFFSET, 0x1353048);
+DECLARE_OFFSET(CBaseModFooterPanel__OnCommand_vtable_index, EMPTY_OFFSET, 97);
 DECLARE_OFFSET(CBaseModFooterPanel__DrawButtonAndText_stub, EMPTY_OFFSET, 0x4DC438);
 DECLARE_OFFSET(LoadingProgress__SetupControlStates_dot_patch, EMPTY_OFFSET, 0x5155D4);
 DECLARE_OFFSET(LoadingProgress__DrawLoadingBar_dot_patch, EMPTY_OFFSET, 0x515B04);
@@ -73,6 +75,7 @@ DECLARE_OFFSET(CInputSystem__PostUserEvent, 152, 176);
 DECLARE_OFFSET(CInputSystem__m_nLastSampleTick, 3464, 14064);
 
 // launcher.nro
+DECLARE_OFFSET(CSDLMgr__SetCursorPosition_vtable_index, 10, 13);
 DECLARE_OFFSET(CSDLMgr__PumpWindowsMessageLoop_vtable_index, 15, 19);
 DECLARE_OFFSET(CSDLMgr__PostEvent, 0xF734, 0x13A88);
 
