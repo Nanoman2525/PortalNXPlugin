@@ -98,37 +98,6 @@ DECLARE_MEMBER_HOOK_FUNC( void, CSDLMgr, SetCursorPosition, void *thisptr, int x
 }
 
 //---------------------------------------------------------------------------------
-// Purpose: Hook to fix fire double mouse click events.
-// TODO:    This double press code should apply to all mouse buttons, not just MOUSE_LEFT.
-//---------------------------------------------------------------------------------
-DECLARE_MEMBER_HOOK_FUNC(bool, CInputSystem, InternalMousePressed, void *thisptr, int code)
-{
-    // The thisptr is the same as g_pInput:
-    // Portal 2: *(void **)(clientnrobase + 0x1641320);
-
-    // We do this here, since it does not work through normal input event means.
-    const int MOUSE_LEFT = 107;
-    if (code == MOUSE_LEFT)
-    {
-        static auto Plat_FloatTime = (double (*)())(enginenrobase + Offsets::Plat_FloatTime);
-        static double prevDoublePressTime = 0;
-
-        double currentTime = Plat_FloatTime();
-        double timeDiff = currentTime - prevDoublePressTime;
-        prevDoublePressTime = currentTime;
-
-        if (timeDiff > 0 && timeDiff <= 0.3)
-        {
-            // Code is most similar to CInputOSX::InternalMouseDoublePressed
-            auto CInputSystem__InternalMouseDoublePressed = reinterpret_cast<bool (*)(void *, int)>(reinterpret_cast<uintptr_t **>(vgui2nrobase + Offsets::CInputSystem__vtable)[Offsets::CInputSystem__InternalMouseDoublePressed_vtable_index]);
-            CInputSystem__InternalMouseDoublePressed(thisptr, code);
-        }
-    }
-
-    return CInputSystem__InternalMousePressed_Original(thisptr, code);
-}
-
-//---------------------------------------------------------------------------------
 // Purpose: Hook to fix cursor crash on menu option hover
 // TODO:    Re-add the implementation to select it
 //---------------------------------------------------------------------------------
@@ -388,9 +357,6 @@ void ToggleVTableDetours( bool bPatching )
 
     // Allows us to not reach the borders of the screen when moving the mouse while in-game (Won't work when using Ryujinx since no locked mouse capture supported)
     ToggleDetour(&(*reinterpret_cast<void ***>(g_pLauncherMgr))[Offsets::CSDLMgr__SetCursorPosition_vtable_index], CSDLMgr__SetCursorPosition_Original, CSDLMgr__SetCursorPosition_Hook, bPatching);
-
-    // We need this detour to actually fire double mouse click events since they normally don't work for some reason
-    ToggleDetour(VTABLE_FUNC_ADDRESS(vgui2nrobase, Offsets::CInputSystem__vtable, Offsets::CInputSystem__InternalMousePressed_vtable_index), CInputSystem__InternalMousePressed_Original, CInputSystem__InternalMousePressed_Hook, bPatching);
 
     if (!g_Plugin.IsGamePortal2())
     {

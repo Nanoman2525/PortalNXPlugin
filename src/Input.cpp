@@ -510,67 +510,93 @@ void ScaleMouse(nn::hid::MouseState &mouseState)
 
 void ProcessMouseState(const nn::hid::MouseState& mouseState)
 {
+    auto CSDLMgr__PostEvent = (void (*)(void *, const CCocoaEvent&))(launchernrobase + Offsets::CSDLMgr__PostEvent);
+
+    // CSDLMgr::PumpWindowsMessageLoop case SDL_MOUSEBUTTONUP and SDL_MOUSEBUTTONDOWN
     {
-        // https://switchbrew.org/wiki/HID_services#MouseButton
-        static const struct { int buttonCode; uint32_t bitMask; } mouseButtonMap[] = {
-            { MOUSE_LEFT, 1 }, { MOUSE_MIDDLE, 2 }, { MOUSE_RIGHT, 4 }, { MOUSE_5, 8 }, { MOUSE_4, 16 }
-        };
-
-        static uint32_t prevMouseState = 0;
-        static bool wasMouseButtonPressed[MOUSE_COUNT] = { false };
-
-        // Process mouse buttons
-        for (size_t i = 0; i < sizeof(mouseButtonMap) / sizeof(mouseButtonMap[0]); i++)
+        // https://switchbrew.org/wiki/HID_services#MouseButton (for bitMask)
+        static const struct { int buttonCode; uint32_t bitMask; uint32_t cocoaButton; } mouseButtonMap[] =
         {
-            int buttonCode = mouseButtonMap[i].buttonCode;
-            uint32_t buttonBitMask = mouseButtonMap[i].bitMask;
+            { MOUSE_LEFT,   (1 << 0), (1 << 0) },
+            { MOUSE_MIDDLE, (1 << 1), (1 << 2) },
+            { MOUSE_RIGHT,  (1 << 2), (1 << 1) },
+            { MOUSE_5,      (1 << 3), (1 << 4) },
+            { MOUSE_4,      (1 << 4), (1 << 3) }
+        };
+        static uint32_t prevMouseState = 0;
 
-            // Check if the button state has changed
-            bool currentState = (mouseState.Buttons & buttonBitMask) != 0;
+        // TODO: We need to double check if the members and offsets for these still exist in g_pLauncherMgr
+        // For now, just have the plugin track it
+        static uint32_t m_mouseButtons;
+        static bool m_bGotMouseButtonDown;
+        static uint32_t m_MouseButtonDownTimeStamp;
+        static int m_MouseButtonDownX;
+        static int m_MouseButtonDownY;
+
+        for (size_t i = 0; i < (sizeof(mouseButtonMap) / sizeof(mouseButtonMap[0])); i++)
+        {
+            uint32_t buttonBitMask = mouseButtonMap[i].bitMask;
+            uint32_t cocoaButton   = mouseButtonMap[i].cocoaButton;
+
+            bool bPressed      = (mouseState.Buttons & buttonBitMask) != 0;
             bool previousState = (prevMouseState & buttonBitMask) != 0;
 
-            if (currentState != previousState)
+            if (bPressed == previousState)
             {
-                // Update the bit in the previous state
-                if (currentState)
-                    prevMouseState |= buttonBitMask;
-                else
-                    prevMouseState &= ~buttonBitMask;
+                continue; // Nothing changed, skip to next mouse button
+            }
 
-                if (currentState)
+            if (bPressed)
+            {
+                m_mouseButtons |= cocoaButton;
+            }
+            else
+            {
+                m_mouseButtons &= ~cocoaButton;
+            }
+
+            bool bDoublePress = false;
+            if (bPressed)
+            {
+                prevMouseState |= buttonBitMask;
+
+                // Simulate SDL timestamp via Plat_FloatTime -> milliseconds
+                static auto Plat_FloatTime = (double (*)())(enginenrobase + Offsets::Plat_FloatTime);
+                uint32_t now = (uint32_t)(Plat_FloatTime() * 1000.0);
+
+                // Hook up the ConVars again
+                Variable sdl_double_click_time = Variable("sdl_double_click_time");
+                Variable sdl_double_click_size = Variable("sdl_double_click_size");
+
+                if (m_bGotMouseButtonDown &&
+                    ((int)(now - m_MouseButtonDownTimeStamp) <= sdl_double_click_time.GetInt()) &&
+                    (abs(mouseState.x - m_MouseButtonDownX) <= sdl_double_click_size.GetInt()) &&
+                    (abs(mouseState.y - m_MouseButtonDownY) <= sdl_double_click_size.GetInt()))
                 {
-                    if (!wasMouseButtonPressed[buttonCode - MOUSE_FIRST])
-                    {
-                        wasMouseButtonPressed[buttonCode - MOUSE_FIRST] = true;
-
-                        PostUserEvent(IE_ButtonPressed, buttonCode, buttonCode); // m_nData2 is what allows this to interact with vgui
-                    }
-
-                    // Note: When it comes to double clicking, it straight up does not fire the function even when I tried setting it up correctly
-                    // It will be activated through a detour
+                    bDoublePress = true;
+                    m_bGotMouseButtonDown = false;
                 }
                 else
                 {
-                    if (wasMouseButtonPressed[buttonCode - MOUSE_FIRST])
-                    {
-                        wasMouseButtonPressed[buttonCode - MOUSE_FIRST] = false;
-
-                        PostUserEvent(IE_ButtonReleased, buttonCode, buttonCode); // m_nData2 is what allows this to interact with vgui
-                    }
+                    m_MouseButtonDownTimeStamp = now;
+                    m_MouseButtonDownX  = mouseState.x;
+                    m_MouseButtonDownY  = mouseState.y;
+                    m_bGotMouseButtonDown = true;
                 }
             }
+            else
+            {
+                prevMouseState &= ~buttonBitMask;
+            }
+
+            CCocoaEvent event{};
+            event.m_EventType        = bPressed ? 2 : 4; // CocoaEvent_MouseButtonDown : CocoaEvent_MouseButtonUp
+            event.m_MouseButtonFlags = m_mouseButtons;
+            event.m_nMouseClickCount = bDoublePress ? 2 : 1;
+            event.m_MouseButton      = cocoaButton;
+            CSDLMgr__PostEvent(g_pLauncherMgr, event);
         }
-
-        // TODO: Rework the above area and feed it into the cocoa system. This way, we can possibly eliminate the double click detour hack.
-        // CCocoaEvent theEvent;
-        // theEvent.m_EventType = (bPressed) ? 2 : 4; // CocoaEvent_MouseButtonDown : CocoaEvent_MouseButtonUp
-        // theEvent.m_MouseButtonFlags = m_mouseButtons;
-        // theEvent.m_nMouseClickCount = bDoublePress ? 2 : 1;
-        // theEvent.m_MouseButton = cocoaButton;
-        // PostEvent( theEvent );
     }
-
-    auto CSDLMgr__PostEvent = (void (*)(void *, const CCocoaEvent&))(launchernrobase + Offsets::CSDLMgr__PostEvent);
 
     // CSDLMgr::PumpWindowsMessageLoop case SDL_MOUSEWHEEL
     if (mouseState.wheelDeltaY != 0)
@@ -592,11 +618,12 @@ void ProcessMouseState(const nn::hid::MouseState& mouseState)
     if (*reinterpret_cast<bool *>((uintptr_t)g_pLauncherMgr + 41)) // CSDLMgr::m_bHasFocus
     {
         // Updates the deltas so that the in-game input can track it
+        // Note: Need to test if the MouseState deltas work normally on a real Switch
         static int32_t oldx = 0;
         static int32_t oldy = 0;
 
-        *(int *)((uintptr_t)g_pLauncherMgr + 48) += (oldx - mouseState.x) * -1; // CSDLMgr::m_nMouseXDelta
-        *(int *)((uintptr_t)g_pLauncherMgr + 52) += (oldy - mouseState.y) * -1; // CSDLMgr::m_nMouseYDelta
+        *(int *)((uintptr_t)g_pLauncherMgr + 48) += (mouseState.x - oldx); // CSDLMgr::m_nMouseXDelta
+        *(int *)((uintptr_t)g_pLauncherMgr + 52) += (mouseState.y - oldy); // CSDLMgr::m_nMouseYDelta
 
         // Save previous state
         oldx = mouseState.x;
@@ -665,9 +692,13 @@ void GetSWKBInput(char* buf, size_t size, const char *pszHeaderText, const char 
 static bool s_bGatheringSWKBInput = false;
 static char s_SWKBBuf[512];
 
-// Ideally we would try to hook into the existing existing SDL subsystem.
-// However, it doesn't poll for other peripherals that we want,
-// (except for mouse and even then, only in Portal 2). So we poll it all ourselves.
+// Both games use SDL, however, much of their code that fires events for keyboard and mouse inputs has been stripped.
+// There is native polling for mouse only in Portal 2, but not much else. (not hooked up properly anyway)
+// This makes hooking into the SDL subsystem non-indeal, so we poll everything ourselves and manually fire equivalent events into the input system.
+
+// Note: Both games have only these SDL events compiled in CSDLMgr::PumpWindowsMessageLoop:
+// SDL_QUIT, SDL_WINDOWEVENT (SDL_WINDOWEVENT_RESIZED [new to Switch], SDL_WINDOWEVENT_LEAVE, SDL_WINDOWEVENT_FOCUS_GAINED, SDL_WINDOWEVENT_FOCUS_LOST), and SDL_TEXTINPUT
+// While SDL_TEXTINPUT does exist, it's never called. It's easier to just remake it.
 void NXInputLoop()
 {
     if (nx_enable_keyboard_support.GetBool())
