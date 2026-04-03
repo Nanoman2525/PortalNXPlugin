@@ -121,6 +121,36 @@ CON_COMMAND(nx_toggle_force_max_fps, "Forces r_dynres_enable and nvn_swap_interv
     Msg("nx_toggle_force_max_fps - %s.\n", nx_force_max_fps.bPatched ? "Patched" : "Unpatched");
 }
 
+// Make challenge mode menu navigation work without internet/NSO
+static TogglePatch nx_CSinglePlayer__OnCommand_check1 = { &clientnrobase, &Offsets::CSinglePlayer__OnCommand_cm_check1, { 0x1F, 0x20, 0x03, 0xD5 } };
+static TogglePatch nx_CSinglePlayer__OnCommand_check2 = { &clientnrobase, &Offsets::CSinglePlayer__OnCommand_cm_check2, { 0x1F, 0x20, 0x03, 0xD5 } };
+static TogglePatch nx_CStartCoopGame__OnCommand_check1 = { &clientnrobase, &Offsets::CStartCoopGame__OnCommand_cm_check1, { 0x1F, 0x20, 0x03, 0xD5 } };
+static TogglePatch nx_CStartCoopGame__OnCommand_check2 = { &clientnrobase, &Offsets::CStartCoopGame__OnCommand_cm_check2, { 0x1F, 0x20, 0x03, 0xD5 } };
+static TogglePatch nx_CPortalLeaderboardPanel__OnThink_check1 = { &clientnrobase, &Offsets::CPortalLeaderboardPanel__OnThink_cm_check1, { 0x1F, 0x20, 0x03, 0xD5 } };
+static TogglePatch nx_CPortalLeaderboardPanel__OnThink_check2 = { &clientnrobase, &Offsets::CPortalLeaderboardPanel__OnThink_cm_check2, { 0x1F, 0x20, 0x03, 0xD5 } };
+CON_COMMAND(nx_toggle_ui_challenge_mode_menu_access, "Restores the ability to enter these menus without internet/NSO.")
+{
+    if (!g_Plugin.IsGamePortal2())
+    {
+        Msg("nx_toggle_ui_challenge_mode_menu_access - Works only on Portal 2 game binaries.\n");
+        return;
+    }
+
+    // For the "PLAY SINGLE PLAYER -> CHALLENGE MODE" button
+    nx_CSinglePlayer__OnCommand_check1.Toggle();
+    nx_CSinglePlayer__OnCommand_check2.Toggle();
+
+    // For the "PLAY COOPERATIVE GAME -> PLAY ONLINE" button
+    nx_CStartCoopGame__OnCommand_check1.Toggle();
+    nx_CStartCoopGame__OnCommand_check2.Toggle();
+
+    // While we are in any of the challenge mode menus at all, it will constantly run a check (For if you lose internet/NSO connection)
+    nx_CPortalLeaderboardPanel__OnThink_check1.Toggle();
+    nx_CPortalLeaderboardPanel__OnThink_check2.Toggle();
+
+    Msg("nx_toggle_ui_challenge_mode_menu_access - %s.\n", nx_CSinglePlayer__OnCommand_check1.bPatched ? "Patched" : "Unpatched");
+}
+
 void CBaseModFooterPanel__FixLayout_Restored(bool bHideAllButtons)
 {
     uintptr_t CBaseModPanel__m_CFactoryBasePanel = *(uintptr_t *)(clientnrobase + 0x1614958); // CBaseModPanel* type

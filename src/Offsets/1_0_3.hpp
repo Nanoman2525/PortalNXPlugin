@@ -58,6 +58,12 @@ DECLARE_OFFSET(CBaseModFooterPanel__OnCommand_vtable_index, EMPTY_OFFSET, 97);
 DECLARE_OFFSET(CBaseModFooterPanel__DrawButtonAndText_stub, EMPTY_OFFSET, 0x4DC438);
 DECLARE_OFFSET(LoadingProgress__SetupControlStates_dot_patch, EMPTY_OFFSET, 0x5155D4);
 DECLARE_OFFSET(LoadingProgress__DrawLoadingBar_dot_patch, EMPTY_OFFSET, 0x515B04);
+DECLARE_OFFSET(CSinglePlayer__OnCommand_cm_check1, EMPTY_OFFSET, 0x5423D8);
+DECLARE_OFFSET(CSinglePlayer__OnCommand_cm_check2, EMPTY_OFFSET, 0x5423E4);
+DECLARE_OFFSET(CStartCoopGame__OnCommand_cm_check1, EMPTY_OFFSET, 0x548208);
+DECLARE_OFFSET(CStartCoopGame__OnCommand_cm_check2, EMPTY_OFFSET, 0x548214);
+DECLARE_OFFSET(CPortalLeaderboardPanel__OnThink_cm_check1, EMPTY_OFFSET, 0x527D84);
+DECLARE_OFFSET(CPortalLeaderboardPanel__OnThink_cm_check2, EMPTY_OFFSET, 0x527D90);
 
 // engine.nro
 DECLARE_OFFSET(Plat_FloatTime, 0x3ABAE0, 0x4C16F0);
